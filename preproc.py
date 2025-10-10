@@ -2,7 +2,7 @@ import cv2, csv, random
 import numpy as np
 import shared
 # screen recorder(for future dsand runs)
-# see main.py at elif=='2'
+# see torchML at elif == 4
 
 # image processor(for screenshot test runs)
 def image_proc(input_data, size=(128,128), augment=False, debug=False, mode='dense'):
@@ -29,7 +29,7 @@ def image_proc(input_data, size=(128,128), augment=False, debug=False, mode='den
             if random.random() > 0.75:
                 noise = np.random.normal(0, 8, img.shape)
                 img = np.clip(img + noise, 0, 255).astype(np.uint8)
-        # basic ML stuff(resize and normalize)
+        # resize and normalize
         img = cv2.resize(img, size)
         img = img.astype('float32') / 255.0
         # output image
@@ -68,6 +68,7 @@ def new_augment(paths, labels, augment_count=5, debug=False, mode='dense'):
     return x, y
 
 # yayyyyy csv to numpy(not jpg unfortunately)
+# useless block for now
 def csv_to_np(csv_path, size=(128,128,3)):
     height, width, color = size
     expected_len = height * width * color
@@ -83,3 +84,4 @@ def csv_to_np(csv_path, size=(128,128,3)):
             data.append(flat)
     arr = np.stack(data, axis=0)
     return arr
+
