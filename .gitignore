@@ -1,0 +1,22 @@
+# py cache and temp files
+__pycache__/
+*.pyc
+*.pyo
+*.tmp
+*.log
+
+# models and datasets
+*.npz
+data/
+models/
+checkpoints/
+
+# vid
+*.mp4
+*.avi
+output/
+results/
+
+# ide settings
+.vscode/
+.idea/
