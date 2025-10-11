@@ -1,11 +1,12 @@
-# susie cnn v1
+# susie cnn v1.01
+# fixed confidence output issues
 # plan is to fix cnn quirks(not detecting susie well)
 
 # modifiable variables:
-# ln 187 if threshold
-# ln 60, 122 if generations
-# ln 62, 122 if learn rate
-# ln 110 if augment count
+# ln 149 if threshold
+# ln 65, 131 if generations
+# ln 65, 129 if learn rate
+# ln 118 if augment count
 
 import numpy as np
 import torch, os, time, cv2, mss
@@ -64,18 +65,21 @@ def prepareData(pos, neg):
 
 def train(model, loader, generations=50, lr=5e-4):
     # bce equation got 1-lined... which is good
-    criterion = nn.BCELoss()
+    model.train()
+    criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
     
     for gen in range(generations):
+        epoch_loss = 0.0
         for batchX, batchY in loader:
             optimizer.zero_grad()
             predictions = model(batchX)
             loss = criterion(predictions, batchY)
             loss.backward()
             optimizer.step()
-            
-        print(f'Gen: {gen+1}/{generations} // loss: {loss.item():.5f}')
+            epoch_loss += loss.item()
+        avg_loss = epoch_loss/len(loader)    
+        print(f'Gen: {gen+1}/{generations} // loss: {avg_loss:.5f}')
     print('train done!')
     return model
 
@@ -92,8 +96,8 @@ def load(model, path='C:/Users/Dave/susieML/models/susieCNN.pth'):
 def predict(model, img):
     x = torch.tensor(img/ 255, dtype=torch.float32).permute(2,0,1).unsqueeze(0)
     with torch.inference_mode():
-        out = model(x)
-        conf = out.item()
+        logits = model(x)
+        conf = torch.sigmoid(logits).item()
     print(f"confidence level: {conf:.3f}")
     return conf
 
@@ -112,16 +116,16 @@ def main(mode):
         print("Training paths: ", train_path)
         print("Labels: ", train_labels)
 
-        train_input, checker_train = new_augment(train_path, train_labels, augment_count=10, mode='cnn')
+        train_input, checker_train = new_augment(train_path, train_labels, augment_count=5, mode='cnn')
         epsilon = 0.05
         checker_train = checker_train * (1-epsilon)+(epsilon/2)
+        
         train_input = np.array(train_input).reshape(-1,3,128,128)
         checker_train = np.array(checker_train).reshape(-1,1)
         
         X_train = torch.tensor(train_input, dtype=torch.float32).to(device)
         y_train = torch.tensor(checker_train, dtype=torch.float32).to(device)
         
-        model = sussyCNN().to(device)
         lossFN = nn.BCEWithLogitsLoss()
         optimizer = optim.Adam(model.parameters(), lr=5e-4)
         
@@ -137,32 +141,35 @@ def main(mode):
                 print(f"Gen: {gen+1}/{generations} ; loss: {loss.item():.5f}")
         
         # save model n input
-        model = sussyCNN().to(device)
         torch.save(model.state_dict(),'C:/Users/Dave/susieML/models/susieCNN.pth')
         print("model saved to models folder.")
     
     # cnn detection part    
     elif mode == '4':
         modelPath = 'C:/Users/Dave/susieML/models/susieCNN.pth'
-        cooldown = 1
+        threshold = 0.67 # 0.67 default(cuz why not)
         sideLen = 128 # input from image
-        steps = 96 # scanner-type steps
+        steps = 64 # scanner-type steps
         windowHistory = 5
         detectionsHistory = []
         
         if not os.path.exists(modelPath):
             raise FileNotFoundError(f"model FNF: {modelPath}")
         print("model/s loaded with input size well")
+        model = sussyCNN().to(device)
+        model.load_state_dict(torch.load(modelPath, map_location=device))
+        model.eval()
         
         sct = mss.mss()
         monitor = sct.monitors[1]
-        lastDetectionTime = 0
         while True:
             screenshot = np.array(sct.grab(monitor))
             frame = cv2.cvtColor(screenshot, cv2.COLOR_BGRA2BGR)
             # reset per frame vars
             heatmap = np.zeros((frame.shape[0], frame.shape[1]), dtype=np.float32)
             countmap = np.zeros_like(heatmap)
+            patches = []
+            coords = []
             max_conf = 0.0
             max_xy = (0,0)
             detectedThisFrame = False
@@ -171,21 +178,25 @@ def main(mode):
             for y in range(0, frame.shape[0] - sideLen, steps):
                 for x in range(0, frame.shape[1]-sideLen, steps):
                     patch = frame[y:y+sideLen, x:x+sideLen]
-                    tensor = (torch.from_numpy(patch).permute(2,0,1).unsqueeze(0).float() / 255).to(device)
-                    tensor = tensor.to(device)
-                    # predict but cnn
-                    with torch.no_grad():
-                        pred = torch.sigmoid(model(tensor)).item()
-                    if pred > max_conf:
-                        max_conf = pred
-                        max_xy = (x,y)
-                    heatmap[y:y+sideLen, x:x+sideLen] += pred
-                    heatmap = np.clip(heatmap,0,1)
-                    countmap[y:y+sideLen, x:x+sideLen] += 1
-            
+                    patch = cv2.cvtColor(patch, cv2.COLOR_BGRA2BGR)
+                    patch = torch.tensor(patch/255, dtype=torch.float32).permute(2,0,1)
+                    patches.append(patch)
+                    coords.append((x,y))
+                    
+            # predict but cnn
+            batch = torch.stack(patches).to(device)
+            with torch.no_grad():
+                preds = torch.sigmoid(model(batch)).cpu().numpy().flatten()
+                
+            for (x,y), pred in zip(coords, preds):
+                conf = float(np.squeeze(pred))
+                heatmap[y:y+sideLen, x:x+sideLen] += conf
+                countmap[y:y+sideLen, x:x+sideLen] += 1
+                if conf > max_conf:
+                    max_conf = conf
+                    max_xy = (x,y)
+             
             heatmap /= np.maximum(countmap, 1)
-            threshold = 0.67 # 0.67 default(cuz why not)
-            
             mask = heatmap >= threshold
             y, x = np.where(mask)
             # shows average heatmap box
@@ -195,21 +206,20 @@ def main(mode):
                 cv2.rectangle(frame, (x_min, y_min), (x_max, y_max), (0,255,0),2)
             
             # detection history... duh(prints only in consistent frames)
+            max_conf = np.max(preds)
             detectionsHistory.append(max_conf)
             if len(detectionsHistory) > windowHistory:
                 detectionsHistory.pop(0)
             avg_conf = np.mean(detectionsHistory)
 
             # confidence decay floor fix
-            current_time = time.time()
-            if avg_conf >= threshold and current_time - lastDetectionTime > cooldown:
-                lastDetectionTime = current_time
-                detectedThisFrame = True
+            if avg_conf >= threshold:
                 x,y = max_xy
                 cv2.rectangle(frame, (x,y), (x+sideLen, y+sideLen), (0,255,0),2)
                 print(f"sussy maybe found..? average conf lvl: {max_conf:.3f}, max conf lvl:{max_conf:.3f}")
-            else: print(f"no sussy :( avg=({avg_conf:.3f}), max=({max_conf:.3f}) ")  
-            
+            else:
+                print(f"no sussy :( avg=({avg_conf:.3f}), max=({max_conf:.3f}) ")  
+
             cv2.imshow("bleh twan detection(CNN)", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
