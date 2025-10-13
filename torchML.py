@@ -3,15 +3,14 @@
 # plan is to fix cnn quirks(not detecting susie well)
 
 # modifiable variables:
-# ln 154 if threshold
-# ln 68, 136 if generations
-# ln 69, 134 if learn rate
-# ln 123 if augment count
-# ln 88, 91, 146, 151 if save path
+# ln 153 if threshold
+# ln 67, 135 if generations
+# ln 67, 133 if learn rate
+# ln 122 if augment count
+# ln 87, 90, 145, 150 if save path
 
 import numpy as np
-import torch, os, time, cv2, mss
-import shared
+import torch, os, cv2, mss
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader

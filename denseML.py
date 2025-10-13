@@ -1,5 +1,4 @@
 # susieML v1 NumPy edition(very inefficient)
-# plan is to add torch as scaling(understanding ML with numpy, scaling with torch)
 # target goal for today:
 # 300x2 train image with learn = 0.01-0.05 and neuron set = 1024
 import cv2, time, os, mss

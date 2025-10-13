@@ -1,6 +1,8 @@
 import importlib
 # modes duh
+print("")
 mode = input(
+    "--susieML interface--\n"
     "1 = Train (dense susieML)\n"
     "2 = Find Sussy(dense)\n"
     "3 = Train (torch susieCNN)\n"
