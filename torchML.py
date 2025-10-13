@@ -3,10 +3,11 @@
 # plan is to fix cnn quirks(not detecting susie well)
 
 # modifiable variables:
-# ln 152 if threshold
-# ln 67, 134 if generations
-# ln 67, 132 if learn rate
-# ln 121 if augment count
+# ln 154 if threshold
+# ln 68, 136 if generations
+# ln 69, 134 if learn rate
+# ln 123 if augment count
+# ln 88, 91, 146, 151 if save path
 
 import numpy as np
 import torch, os, time, cv2, mss
@@ -85,10 +86,10 @@ def train(model, loader, generations=50, lr=5e-4):
     return model
 
 # le save n load
-def save(model, path='C:/Users/Dave/susieML/models/susieCNN.pth'):
+def save(model, path='susieML/models/susieCNN.pth'):
     torch.save(model.state_dict(), path)
     print(f"model saved ({path})")
-def load(model, path='C:/Users/Dave/susieML/models/susieCNN.pth'):
+def load(model, path='susieML/models/susieCNN.pth'):
     model.load_state_dict(torch.load(path))
     model.eval()
     print("model loaded")
@@ -234,3 +235,4 @@ def main(mode):
         cv2.destroyAllWindows()
 
     else: print('Invalid mode..')
+
