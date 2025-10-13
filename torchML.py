@@ -143,12 +143,12 @@ def main(mode):
                 print(f"Gen: {gen+1}/{generations} ; loss: {loss.item():.5f}")
         
         # save model n input
-        torch.save(model.state_dict(),'C:/Users/Dave/susieML/models/susieCNN.pth')
+        torch.save(model.state_dict(),'susieML/models/susieCNN.pth') # input full save path
         print("model saved to models folder.")
     
     # cnn detection part    
     elif mode == '4':
-        modelPath = 'C:/Users/Dave/susieML/models/susieCNN.pth'
+        modelPath = 'susieML/models/susieCNN.pth' # input save path
         threshold = 0.67 # 0.67 default(cuz why not)
         sideLen = 128 # scan window size
         steps = 64 # scanner steps(64 fast, 32 depth)
@@ -232,4 +232,5 @@ def main(mode):
                 break
             
         cv2.destroyAllWindows()
+
     else: print('Invalid mode..')
