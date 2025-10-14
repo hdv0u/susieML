@@ -88,8 +88,7 @@ def main(mode):
         modelPath = r"c:/users/dave/susieml/models/susie_model.npz"
         input_size = 128*128*3  # adjusted to preproc
         cooldown = 0.5
-        ### 0.3 no sussy, 0.4 <= 0.5 uncertain, > 0.6 yes sussy
-        threshold = 0.3 # no im serious(0.67 as main)
+        threshold = 0.3 # 0.67 as default
         channels = 3
         # load model
         nn = denseSussyML(input_size=input_size)
@@ -100,30 +99,29 @@ def main(mode):
         # screenrec thing
         sct = mss.mss()
         monitor = sct.monitors[1]
-        detected = False
         lastDetectionTime = 0
         sideLen = int((input_size / channels) ** 0.5)
         while True:
             screenshot = np.array(sct.grab(monitor))
             frame = cv2.cvtColor(screenshot, cv2.COLOR_BGRA2BGR)
             frame_small = cv2.resize(frame, (sideLen, sideLen)) # match training and norms
+            
             X = frame_small.flatten().reshape(1, -1) / 255.0
             if X.shape[1] != nn.weightbias1.shape[0]:
                 raise ValueError(f"input {X.shape[1]} didnt match the network {nn.weightbias1.shape[0]}")
             # prediction time
             pred = nn.predict(X)[0][0]
             current_time = time.time()
+            
             if pred >= threshold and current_time - lastDetectionTime > cooldown:
                 lastDetectionTime = current_time
-                detected = True
                 print(f"sussy maybe found..? confidence lvl: {pred:.2f}")
                 # some visual feedback
                 cv2.putText(frame, f"Detected! {pred:.2f}", (50, 50),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
                 cv2.rectangle(frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 255, 0), 2)
                 time.sleep(0.5)
-            else:
-                detected = False
+                
             # visual Output
             cv2.imshow("bleh twan detection", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"): break

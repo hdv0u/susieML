@@ -16,9 +16,9 @@ import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
 # custom imports(shared do window input, preproc is preproc)
 from shared import outputImgP
-from preproc import image_proc, new_augment
+from preproc import new_augment
 
-# STRICTLY 128 for now(inputs are 200 max)
+# the brain; input = 128x128x3
 class sussyCNN(nn.Module):
     def __init__(self, input_size:int=128):
         super().__init__()
@@ -46,8 +46,8 @@ class sussyCNN(nn.Module):
         )
     def forward(self, x):
         x = self.features(x)
-        x = x.view(x.size(0),-1)
-        x = self.classifier(x)
+        flat = x.view(x.size(0),-1)
+        x = self.classifier(flat)
         return x
 
 # ts combine pos and neg images(BCE for now)
@@ -85,6 +85,7 @@ def train(model, loader, generations=50, lr=5e-4):
     return model
 
 # le save n load
+# gonna add the dynamic pathing for convenience
 def save(model, path='susieML/models/susieCNN.pth'):
     torch.save(model.state_dict(), path)
     print(f"model saved ({path})")
@@ -108,7 +109,7 @@ def main(mode):
     model = sussyCNN().to(device)
     if mode == '3':
         # file picker window
-        train_path = outputImgP()
+        train_path = outputImgP() # window picker from 
         if isinstance(train_path, tuple):
             train_path = train_path[0]
         if len(train_path) == 0:
@@ -130,7 +131,7 @@ def main(mode):
         
         lossFN = nn.BCEWithLogitsLoss()
         optimizer = optim.Adam(model.parameters(), lr=5e-4)
-        # training loop..?
+        # training loop..!
         generations=50
         for gen in range(generations):
             model.train()
@@ -177,7 +178,6 @@ def main(mode):
             coords = []
             max_conf = 0.0
             max_xy = (0,0)
-            detectedThisFrame = False
             
             # window scanning
             for y in range(0, frame.shape[0] - sideLen, steps):

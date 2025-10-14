@@ -1,6 +1,6 @@
 import re, os, numpy as np
-# goal is to add a window shi instead of copypasting(done 10/6/25)
-# THIS CODE IS NOW RETIRED!!!
+# add window shi instead of copypasting file(done 10/6/25)
+# not fully retired tho
 def getImage(raw_input, extensions=None):
     if isinstance(raw_input, bytes):
         raw_input = raw_input.decode('utf-8', errors='ignore')

@@ -1,7 +1,7 @@
 from inputFilter import getImage, getLabel
 from imagePicker import labeledPicker
 # bery vasic for now
-# copy paste
+
 imageSizeDefault = 128
 def outputImg():
     raw = input('Enter the list: ')
@@ -9,7 +9,7 @@ def outputImg():
 def outputLabel():
     x = outputImg()
     return getLabel(x)
-# window picker
+# window picker(picks pos & neg files respectively)
 def outputImgP():
     paths, labels = labeledPicker()
     x = getImage(' '.join(paths))
