@@ -12,7 +12,7 @@ __pycache__/
 data/
 checkpoints/
 
-# videos and images
+# video and images
 *.mp4
 *.avi
 output/
@@ -22,4 +22,4 @@ input/
 # ide settings
 .vscode/
 .idea/
-
+.idea/
