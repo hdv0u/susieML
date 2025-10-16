@@ -2,7 +2,7 @@
 does uhh detect Susie
 
 ## Overview
-susieML is a CPU-focused ML that do ML things like train and detect.
+susieML is a mini-tool that train and detect.
 It can be tested with a live-detection screen(for now, no camera support)
 
 ## Features
@@ -12,7 +12,7 @@ It can be tested with a live-detection screen(for now, no camera support)
    - Can be used to detect other characters other than Susie(default)
 
 ## Disclaimer and Notes
-This project is a fan-made passion project that explores PyTorch, ML, and dsand00's 'My Ghost friend'.
+This mini-project tool is purely for fun and this is NOT affiliated with dsand00's 'My Ghost friend'.
 All artwork belongs to the respective creator/s.
 
 ## Future Plans
