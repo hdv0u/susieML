@@ -11,15 +11,13 @@ __pycache__/
 data/
 checkpoints/
 
-# vid
+# video and image
 *.mp4
 *.avi
 output/
 results/
+input/
 
 # ide settings
 .vscode/
 .idea/
-
-*.pt
-*.pth
