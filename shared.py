@@ -1,5 +1,5 @@
 from inputFilter import getImage, getLabel
-from imagePicker import labeledPicker
+from imagePicker import labeledPicker, pick_save
 # bery vasic for now
 
 imageSizeDefault = 128
@@ -14,3 +14,5 @@ def outputImgP():
     paths, labels = labeledPicker()
     x = getImage(' '.join(paths))
     return x, labels
+def savePath():
+    return pick_save()

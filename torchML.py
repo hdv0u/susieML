@@ -15,7 +15,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
 # custom imports(shared do window input, preproc is preproc)
-from shared import outputImgP
+from shared import outputImgP, savePath
 from preproc import new_augment
 
 # the brain; input = 128x128x3
@@ -85,11 +85,12 @@ def train(model, loader, generations=50, lr=5e-4):
     return model
 
 # le save n load
+modelSave = savePath()
 # gonna add the dynamic pathing for convenience
-def save(model, path='susieML/models/susieCNN.pth'):
+def save(model, path=modelSave):
     torch.save(model.state_dict(), path)
     print(f"model saved ({path})")
-def load(model, path='susieML/models/susieCNN.pth'):
+def load(model, path=modelSave):
     model.load_state_dict(torch.load(path))
     model.eval()
     print("model loaded")
@@ -144,12 +145,12 @@ def main(mode):
                 print(f"Gen: {gen+1}/{generations} ; loss: {loss.item():.5f}")
         
         # save model n input
-        torch.save(model.state_dict(),'susieML/models/susieCNN.pth') # input full save path
+        torch.save(model.state_dict(), modelSave) # input full save path
         print("model saved to models folder.")
     
     # cnn detection part    
     elif mode == '4':
-        modelPath = 'susieML/models/susieCNN.pth' # input save path
+        loadPath = modelSave # input save path
         threshold = 0.67 # 0.67 default(cuz why not)
         sideLen = 128 # scan window size
         steps = 64 # scanner steps(64 fast, 32 depth)
@@ -157,12 +158,12 @@ def main(mode):
         detections_history = []
         
         # checks if path exists..
-        if not os.path.exists(modelPath):
-            raise FileNotFoundError(f"model FNF: {modelPath}")
+        if not os.path.exists(loadPath):
+            raise FileNotFoundError(f"model FNF: {loadPath}")
         print("model/s loaded with input size well")
         
         model = sussyCNN().to(device)
-        model.load_state_dict(torch.load(modelPath, map_location=device))
+        model.load_state_dict(torch.load(loadPath, map_location=device))
         model.eval() # no no train
         
         # monitor setup

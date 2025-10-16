@@ -8,7 +8,6 @@ __pycache__/
 # models and datasets
 *.npz
 data/
-models/
 checkpoints/
 
 # vid
