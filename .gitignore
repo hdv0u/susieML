@@ -8,18 +8,18 @@ __pycache__/
 # models and datasets
 *.npz
 *.pt
+*.pth
 data/
 checkpoints/
 
-# vid
+# videos and images
 *.mp4
 *.avi
 output/
 results/
+input/
 
 # ide settings
 .vscode/
 .idea/
 
-*.pt
-*.pth
