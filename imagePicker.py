@@ -19,7 +19,7 @@ def labeledPicker():
     return paths, labels
 
 # save model thing
-def pick_save(default_name='model', default_ext='.pt',targetfolder='models'):
+def save_model(default_name='model', default_ext='.pt',targetfolder='models'):
     root = Tk()
     root.withdraw()
     
@@ -35,10 +35,33 @@ def pick_save(default_name='model', default_ext='.pt',targetfolder='models'):
             ('PyTorch model','*.pt'),
             ('PyTorch alt model','*.pth'),
             ('All files','*.*')
-            ]
+        ]
     )
     if not save: return None
     if not save.endswith(default_ext):
         save += default_ext
-
     return save
+
+# im so dumb i forgot the load thng
+def load_model(default_name='model', default_ext='.pt',targetfolder='models'):
+    root = Tk()
+    root.withdraw()
+    
+    os.makedirs(targetfolder, exist_ok=True)
+    default_path = os.path.join(targetfolder, default_name + default_ext)
+    
+    load = filedialog.askopenfilename(
+        title='Load model',
+        defaultextension = default_ext,
+        initialdir = targetfolder,
+        initialfile = default_name,
+        filetypes=[
+            ('PyTorch model','*.pt'),
+            ('PyTorch alt model','*.pth'),
+            ('All files','*.*')
+        ]
+    )
+    if not load: return None
+    if not load.endswith(default_ext):
+        load += default_ext
+    return load

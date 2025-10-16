@@ -15,7 +15,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import TensorDataset, DataLoader
 # custom imports(shared do window input, preproc is preproc)
-from shared import outputImgP, savePath
+from shared import outputImgP, savePath, loadPath
 from preproc import new_augment
 
 # the brain; input = 128x128x3
@@ -85,12 +85,11 @@ def train(model, loader, generations=50, lr=5e-4):
     return model
 
 # le save n load
-modelSave = savePath()
 # gonna add the dynamic pathing for convenience
-def save(model, path=modelSave):
+def save(model, path=None):
     torch.save(model.state_dict(), path)
     print(f"model saved ({path})")
-def load(model, path=modelSave):
+def load(model, path=None):
     model.load_state_dict(torch.load(path))
     model.eval()
     print("model loaded")
@@ -109,6 +108,7 @@ def main(mode):
     print(f"using {device}")
     model = sussyCNN().to(device)
     if mode == '3':
+        modelSave = savePath()
         # file picker window
         train_path = outputImgP() # window picker from 
         if isinstance(train_path, tuple):
@@ -150,7 +150,7 @@ def main(mode):
     
     # cnn detection part    
     elif mode == '4':
-        loadPath = modelSave # input save path
+        load_model = loadPath() # input save path
         threshold = 0.67 # 0.67 default(cuz why not)
         sideLen = 128 # scan window size
         steps = 64 # scanner steps(64 fast, 32 depth)
@@ -158,12 +158,12 @@ def main(mode):
         detections_history = []
         
         # checks if path exists..
-        if not os.path.exists(loadPath):
-            raise FileNotFoundError(f"model FNF: {loadPath}")
+        if not os.path.exists(load_model):
+            raise FileNotFoundError(f"model FNF: {load_model}")
         print("model/s loaded with input size well")
         
         model = sussyCNN().to(device)
-        model.load_state_dict(torch.load(loadPath, map_location=device))
+        model.load_state_dict(torch.load(load_model, map_location=device))
         model.eval() # no no train
         
         # monitor setup
