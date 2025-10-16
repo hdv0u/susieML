@@ -7,6 +7,7 @@ __pycache__/
 
 # models and datasets
 *.npz
+*.pt
 data/
 checkpoints/
 
@@ -19,3 +20,6 @@ results/
 # ide settings
 .vscode/
 .idea/
+
+*.pt
+*.pth
