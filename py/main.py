@@ -15,12 +15,12 @@ def main():
         ).strip()
     # dense-type 
     if mode in ["1", '2']:
-        dense = importlib.import_module("denseML")
+        dense = importlib.import_module("densenn")
         print("\nrunning denseML(NOT RECOMMENDED)")
         dense.main(mode)
     # cnn-type
     elif mode in ['3', '4']:
-        cnn = importlib.import_module('torchML')
+        cnn = importlib.import_module('convnn')
         print('\nrunning CNN type(better)')
         cnn.main(mode)
     else: print("\nInvalid selection. susie out")
