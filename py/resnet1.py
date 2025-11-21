@@ -1,86 +1,105 @@
-# susie cnn v1.01
-# fixed confidence output issues
-# plan is to add app-like support
-
-# modifiable variables:
-# ln 153 if threshold
-# ln 67, 135 if generations
-# ln 67, 133 if learn rate
-# ln 122 if augment count
-# ln 87, 90, 145, 150 if save path
-
-import numpy as np
-import torch, os, cv2, mss
+import torch, cv2, mss, os
 import torch.nn as nn
 import torch.optim as optim
-# custom imports(shared do window input, preproc is preproc)
+import numpy as np
 from shared import outputImgP, savePath, loadPath
 from preproc import new_augment
-# the brain; input = 128x128x3
-class sussyCNN(nn.Module):
-    def __init__(self, input_size:int=128, out_channels=1):
+
+class Bottleneck(nn.Module):
+    expansion = 4
+    def __init__(self, in_channels, mid_channels, stride=1, downsample=None) -> None:
         super().__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(3,16,3,padding=1),
-            nn.BatchNorm2d(16),
-            nn.ReLU(),
-            nn.Conv2d(16,16,3,padding=1),
-            nn.BatchNorm2d(16),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            
-            nn.Conv2d(16,32,3,padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.Conv2d(32,32,3,padding=1),
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            
-            nn.Conv2d(32,64,3,padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.Conv2d(64,64,3,padding=1),
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            
-            nn.Conv2d(64,128,3,padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
-            nn.Conv2d(128,128,3,padding=1),
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
-            nn.MaxPool2d(2),
-            
-            nn.Conv2d(128,256,3,padding=1),
-            nn.BatchNorm2d(256),
-            nn.ReLU(),
-            
-            nn.AdaptiveAvgPool2d((4,4)),
-        )
-        # hotfix
-        with torch.no_grad():
-            dummy = torch.zeros(1,3,input_size, input_size)
-            flat_size = self.features(dummy).view(1,-1).size(1)
-            
-        self.out_channels = out_channels
-        self.classifier = nn.LazyLinear(self.out_channels)
+        self.conv1 = nn.Conv2d(in_channels, mid_channels, kernel_size=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(mid_channels)
+        
+        self.conv2 = nn.Conv2d(mid_channels, mid_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(mid_channels)
+        
+        self.conv3 = nn.Conv2d(mid_channels, mid_channels * self.expansion, kernel_size=1, bias=False)
+        self.bn3 = nn.BatchNorm2d(mid_channels * self.expansion)
+        
+        self.relu = nn.ReLU(inplace=True)
+        self.downsample = downsample
         
     def forward(self, x):
-        x = self.features(x)
-        x = torch.flatten(x,1)
-        x = self.classifier(x)
-        return x
+        identity = x
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+        
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.relu(out) 
+               
+        out = self.conv3(out)
+        out = self.bn3(out)
+        
+        if self.downsample:
+            identity = self.downsample(x)
+        
+        out += identity
+        out = self.relu(out)
+        return out
 
+class sussyResNet(nn.Module):
+    def __init__(self, layers=[3,4,6,3], num_class=1) -> None:
+        super().__init__()
+        self.in_channels = 64
+        self.conv1 = nn.Conv2d(3,64,7,stride=2,padding=3,bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.relu = nn.LeakyReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(3,stride=2,padding=1)
+        
+        self.layer1 = self._make_layer(64, layers[0])
+        self.layer2 = self._make_layer(128, layers[1],stride=2)
+        self.layer3 = self._make_layer(256, layers[2],stride=2)
+        self.layer4 = self._make_layer(512, layers[3],stride=2)
+        
+        self.avgpool = nn.AdaptiveAvgPool2d((1,1))
+        self.fc = nn.Linear(512*Bottleneck.expansion, num_class)
+        
+    def _make_layer(self, mid_channels, num_blocks, stride=1):
+        downsample = None
+        if stride != 1 or self.in_channels != mid_channels * Bottleneck.expansion:
+            downsample = nn.Sequential(
+                nn.Conv2d(self.in_channels, mid_channels*Bottleneck.expansion,1,stride=stride, bias=False),
+                nn.BatchNorm2d(mid_channels*Bottleneck.expansion)
+            )
+        
+        layers = [Bottleneck(self.in_channels, mid_channels, stride, downsample)]
+        self.in_channels = mid_channels * Bottleneck.expansion
+        for _ in range(1, num_blocks):
+            layers.append(Bottleneck(self.in_channels, mid_channels))
+        return nn.Sequential(*layers)
+    
+    def forward(self,x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+        
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.fc(x)
+        return x
+        
 
 def main(mode):
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print(f"using {device}")
-    model = sussyCNN().to(device)
-    if mode == '3':
+    multi_class = False
+    num_class = 1
+    
+    if multi_class:
+        num_class = int(input("class count: "))
+    device = "cuda" if torch.cuda.is_available() else "cpu"; print(f"using {device}")
+    model = sussyResNet(layers=[3,4,6,3], num_class=num_class).to(device)
+    # train
+    if mode == "5":
         modelSave = savePath()
-        # file picker window
         train_path = outputImgP() # window picker from 
         if isinstance(train_path, tuple):
             train_path = train_path[0]
@@ -99,28 +118,52 @@ def main(mode):
         checker_train = np.array(checker_train).reshape(-1,1)
         
         X_train = torch.tensor(train_input, dtype=torch.float32).to(device)
-        y_train = torch.tensor(checker_train, dtype=torch.float32).to(device)
+        y_train = torch.tensor(checker_train.reshape(-1,1), dtype=torch.float32).to(device)
         
-        lossFN = nn.BCEWithLogitsLoss()
+        if multi_class:
+            lossFN = nn.CrossEntropyLoss()
+        else: lossFN = nn.BCEWithLogitsLoss()
         optimizer = optim.Adam(model.parameters(), lr=5e-4)
+        
         # training loop..!
-        generations=50
+        batch_size = 16
+        generations = 50
+        num_samples = X_train.size(0)
         for gen in range(generations):
             model.train()
-            optimizer.zero_grad()
-            outputs = model(X_train)
-            loss = lossFN(outputs, y_train)
-            loss.backward()
-            optimizer.step()
+            epoch_loss = 0.0
+            
+            indices = torch.randperm(num_samples)
+            for start_idx in range(0, num_samples, batch_size):
+                end_idx = min(start_idx + batch_size, num_samples)
+                batch_idx = indices[start_idx:end_idx]
+                
+                batch_X = X_train[batch_idx]
+                batch_y = y_train[batch_idx]
+                
+                optimizer.zero_grad()
+                outputs = model(batch_X)
+                if outputs.dim() == 1:
+                    outputs = outputs.unsqueeze(1)
+                if batch_y.dim() == 1:
+                    batch_y = batch_y.unsqueeze(1)
+                batch_y = batch_y.float()
+                
+                loss = lossFN(outputs, batch_y)
+                loss.backward()
+                optimizer.step()
+                
+                epoch_loss += loss.item() * batch_X.size(0)
+            avg_loss = epoch_loss / num_samples
             if gen % 1 == 0:
-                print(f"Gen: {gen+1}/{generations} ; loss: {loss.item():.5f}")
+                print(f"Gen: {gen+1}/{generations} ; loss: {avg_loss:.5f}")
         
         # save model n input
         torch.save(model.state_dict(), modelSave) # input full save path
         print("model saved to models folder.")
     
-    # cnn detection part    
-    elif mode == '4':
+    # detect(load)
+    elif mode == "6":
         torch.set_num_threads(os.cpu_count() or 4)
         load_model = loadPath() # input save path
         threshold = 0.67 # 0.67 default(cuz why not)
@@ -134,7 +177,7 @@ def main(mode):
             raise FileNotFoundError(f"model FNF: {load_model}")
         print("model/s loaded with input size well")
         
-        model = sussyCNN().to(device)
+        model = sussyResNet().to(device)
         model.load_state_dict(torch.load(load_model, map_location=device))
         model.eval() # no no train
         cv2.namedWindow("bleh twan detection(CNN)", cv2.WINDOW_NORMAL | cv2.WINDOW_GUI_EXPANDED)
@@ -174,7 +217,7 @@ def main(mode):
                 if conf > max_conf:
                     max_conf = conf
                     max_xy = (x,y)
-             
+            
             # shows average confidence points
             heatmap /= np.maximum(countmap, 1)
             mask = heatmap >= threshold
@@ -205,6 +248,4 @@ def main(mode):
                 break
             
         cv2.destroyAllWindows()
-
-    else: print('Invalid mode..')
-
+    else: print("Invalid input cro.")

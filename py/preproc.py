@@ -1,15 +1,16 @@
-import cv2, csv, random
+import cv2, csv, random, torch
 import numpy as np
 import shared
 # screen recorder(for future dsand runs)
 # see torchML at elif == 4
 
 # image processor(for screenshot test runs)
-def image_proc(input_data, size=(128,128), augment=False, debug=False, mode='dense'):
+def image_proc(input_data, size=(128,128), augment=False, debug=False, 
+                mode='dense', normalize=True, mean=None, std=None):
     def single_proc(path):
         img = cv2.imread(path, cv2.IMREAD_COLOR)
         if img is None:
-            pass# raise ValueError(f"'I can't read {path}' - person when reading a non-img file.")
+            raise ValueError(f"'I can't read {path}' - person when reading a non-img file.")
         # augmentation for image multiplication
         if augment:
             # 50% horizontal n brightness
@@ -31,8 +32,13 @@ def image_proc(input_data, size=(128,128), augment=False, debug=False, mode='den
                 img = np.clip(img + noise, 0, 255).astype(np.uint8)
         # resize and normalize
         img = cv2.resize(img, size)
-        img = img.astype('float32') / 255.0
+        img = img.astype('float32') / 255.0 if normalize else img.astype('float32')
         # output image
+        if mean is not None and std is not None:
+            meanArr = np.array(mean).reshape(1,1,3)
+            stdArr = np.array(std).reshape(1,1,3)
+            img = (img - meanArr) / stdArr
+            
         if debug:
             cv2.imshow("print success!!!!!", img)
             cv2.waitKey(0)
@@ -51,21 +57,43 @@ def image_proc(input_data, size=(128,128), augment=False, debug=False, mode='den
         return np.array([single_proc(p) for p in input_data]) # multiple ML food(good shi)
     else: raise TypeError('must be str or list cro')
 
-def new_augment(paths, labels, augment_count=5, debug=False, mode='dense'):
+def new_augment(paths, labels, augment_count=5, size=(128,128), 
+                mode='dense', normalize=True, mean=None, std=None, 
+                debug=False, return_torch=False, label_mode='auto'):
     # very frustrating but its here for a reason
     if len(paths) == 0 or len(labels) == 0:
         raise ValueError("path/label is none. fix input before augment")
-    x, y = [],[]
+    xs, ys = [],[]
     for path, label in zip(paths, labels):
         original = image_proc(path, augment=False, mode=mode)
-        x.append(original)
-        y.append(label)
+        xs.append(original)
+        ys.append(label)
         for _ in range(augment_count):
-            x.append(image_proc(path, augment=True, mode=mode))
-            y.append(label)
-    x = np.array(x).reshape(len(x), -1)
-    y = np.array(y).reshape(len(y), -1)
-    return x, y
+            xs.append(image_proc(path, augment=True, mode=mode))
+            ys.append(label)
+    
+    xArr = np.stack(xs).astype(np.float32)
+    
+    labelsample = ys[0]
+    if label_mode == 'auto':
+        if isinstance(labelsample, (list, tuple, np.ndarray)) and np.array(labelsample).ndim >= 1 and np.array(labelsample).size > 1:
+            yArr = np.array(ys, dtype=np.float32)
+        else: yArr = np.array(ys, dtype=np.float32).reshape(-1,1)
+    elif label_mode == "bce":
+        yArr = np.array(ys, dtype=np.float32).reshape(-1,1)
+    elif label_mode == 'cce':
+        yArr = np.array(ys, dtype=np.int64).reshape(-1)
+    else: raise ValueError("label must be auto/bce/cce")
+    
+    if return_torch:
+        xT = torch.tensor(xArr, dtype=torch.float32)
+        if label_mode == 'cce':
+            yT = torch.tensor(yArr, dtype=torch.long)
+        else: yT = torch.tensor(yArr, dtype=torch.long)
+        return xT, yT
+    
+    return xArr, yArr
+    
 
 # yayyyyy csv to numpy(not jpg unfortunately)
 # useless block for now
