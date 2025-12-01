@@ -3,20 +3,20 @@ does uhh detect Susie
 
 ## Overview
 susieML is a mini-tool that train and detect.
-It can be tested with a live-detection screen(for now, no camera support)
+It has a screen detection capabilities(for now, no camera support)
 
 ## Features
-- Optimized for CPU processing
+- CPU/GPU support
+- Binary-class detection
+- Multi-class detection(Experimental)
+- A UI(very experimental)
 - Real-time character detection(mss)
-- Very flexible with character detection
-   - Can be used to detect other characters other than Susie(default)
 
 ## Disclaimer and Notes
 This mini-project tool is purely for fun and this is NOT affiliated with dsand00's 'My Ghost friend'.
 All artwork belongs to the respective creator/s.
 
 ## Future Plans
-- Optimize CPU-only FPS
-- Improve generalization on fanart(if CCE/multi-class)
-- Enlarge training data set
-- fix save PATH thingy
+- Make a dedicated UI with customizable parameters
+- Fully implementing multiple-class detection
+- Improving general speed and accuracy
