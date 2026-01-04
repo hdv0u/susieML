@@ -15,6 +15,7 @@ It has a screen detection capabilities(for now, no camera support)
 ## Disclaimer and Notes
 This mini-project tool is purely for fun and this is NOT affiliated with dsand00's 'My Ghost friend'.
 All artwork belongs to the respective creator/s.
+Training/Inference speed varies on the local host machine.
 
 ## Future Plans
 - Make a dedicated UI with customizable parameters
