@@ -48,6 +48,7 @@ class sussyCNN(nn.Module):
             nn.Conv2d(64,128,3,padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(),
+
             nn.Conv2d(128,128,3,padding=1),
             nn.BatchNorm2d(128),
             nn.ReLU(),
@@ -56,7 +57,7 @@ class sussyCNN(nn.Module):
             nn.Conv2d(128,256,3,padding=1),
             nn.BatchNorm2d(256),
             nn.ReLU(),
-            
+
             nn.AdaptiveAvgPool2d((4,4)),
         )
         # hotfix
@@ -73,9 +74,21 @@ class sussyCNN(nn.Module):
         x = self.classifier(x)
         return x
 
+class DataSet(torch.utils.data.Dataset):
+    def __init__(self,X,y) -> None:
+        self.X = torch.tensor(X, dtype=torch.float32)
+        self.y = torch.tensor(y, dtype=torch.float32)
+        
+    def __len__(self):
+        return len(self.X)
+    
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx]
+    
 
 def main(mode):
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    torch.backends.cudnn.benchmark = True
     print(f"using {device}")
     model = sussyCNN().to(device)
     if mode == '3':
@@ -101,18 +114,38 @@ def main(mode):
         X_train = torch.tensor(train_input, dtype=torch.float32).to(device)
         y_train = torch.tensor(checker_train, dtype=torch.float32).to(device)
         
+        batch_size = 16
+
+        train_data = DataSet(train_input, checker_train)
+        train_loader = torch.utils.data.DataLoader(
+            train_data,
+            batch_size=batch_size,
+            shuffle=True,
+            pin_memory=True,
+        )
+        
         lossFN = nn.BCEWithLogitsLoss()
         optimizer = optim.Adam(model.parameters(), lr=5e-4)
         # training loop..!
         generations=50
         for gen in range(generations):
             model.train()
-            optimizer.zero_grad()
-            outputs = model(X_train)
-            loss = lossFN(outputs, y_train)
-            loss.backward()
-            optimizer.step()
+            total_loss = 0.0
+            for X_batch, y_batch in train_loader:
+                X_batch = X_batch.to(device)
+                y_batch = y_batch.to(device)
+                
+                optimizer.zero_grad()
+                
+                outputs = model(X_batch)
+                loss = lossFN(outputs, y_batch)
+                
+                loss.backward()
+                optimizer.step()
+                
+                total_loss += loss.item()
             if gen % 1 == 0:
+                avg_loss = total_loss/len(train_loader)
                 print(f"Gen: {gen+1}/{generations} ; loss: {loss.item():.5f}")
         
         # save model n input
@@ -125,7 +158,7 @@ def main(mode):
         load_model = loadPath() # input save path
         threshold = 0.67 # 0.67 default(cuz why not)
         sideLen = 128 # scan window size
-        steps = 64 # scanner steps(64 fast, 32 depth)
+        steps = 96 # scanner steps(64 fast, 32 depth)
         window_history = 5
         detections_history = []
         
@@ -162,9 +195,22 @@ def main(mode):
                     coords.append((x,y))
                     
             # prediction part maybe
-            batch = torch.stack(patches).to(device)
+            #batch = torch.stack(patches).to(device)
+            #with torch.no_grad():
+            #    preds = torch.sigmoid(model(batch)).cpu().numpy().flatten()
+            
+            infer_batch_size = 8
+            preds = []
+            
             with torch.no_grad():
-                preds = torch.sigmoid(model(batch)).cpu().numpy().flatten()
+                for i in range(0, len(patches), infer_batch_size):
+                    batch_patches = patches[i:i+infer_batch_size]
+                    batch = torch.stack(batch_patches).to(device)
+                    
+                    batch_preds = torch.sigmoid(model(batch))
+                    preds.extend(batch_preds.cpu().numpy().flatten())
+                    
+            preds = np.array(preds)
             
             # building heatmap
             for (x,y), pred in zip(coords, preds):
