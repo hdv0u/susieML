@@ -16,6 +16,7 @@ import torch.optim as optim
 # custom imports(shared do window input, preproc is preproc)
 from shared import outputImgP, savePath, loadPath
 from preproc import new_augment
+import config
 # the brain; input = 128x128x3
 class sussyCNN(nn.Module):
     def __init__(self, input_size:int=128, out_channels=1):
@@ -86,10 +87,10 @@ class DataSet(torch.utils.data.Dataset):
         return self.X[idx], self.y[idx]
     
 
-def main(mode):
+def main(mode, log_fn=print, frame_fn=None, progress_fn=None, stop_fn=None):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     torch.backends.cudnn.benchmark = True
-    print(f"using {device}")
+    log_fn(f"using {device}")
     model = sussyCNN().to(device)
     if mode == '3':
         modelSave = savePath()
@@ -98,11 +99,11 @@ def main(mode):
         if isinstance(train_path, tuple):
             train_path = train_path[0]
         if len(train_path) == 0:
-            print("no files :(")
+            log_fn("no files :(")
             exit() 
         train_labels = [[1] if 'pos' in p.lower() else [0] for p in train_path]
-        print("Training paths: ", train_path)
-        print("Labels: ", train_labels)
+        log_fn("Training paths: ", train_path)
+        log_fn("Labels: ", train_labels)
         
         train_input, checker_train = new_augment(train_path, train_labels, augment_count=5, mode='cnn')
         epsilon = 0.05
@@ -131,7 +132,12 @@ def main(mode):
         for gen in range(generations):
             model.train()
             total_loss = 0.0
+            
             for X_batch, y_batch in train_loader:
+                if stop_fn and stop_fn():
+                    log_fn("train stopped by user")
+                    return
+                
                 X_batch = X_batch.to(device)
                 y_batch = y_batch.to(device)
                 
@@ -145,27 +151,31 @@ def main(mode):
                 
                 total_loss += loss.item()
             if gen % 1 == 0:
+                if progress_fn:
+                    percent = int((gen + 1) / generations * 100)
+                    progress_fn(percent)
                 avg_loss = total_loss/len(train_loader)
-                print(f"Gen: {gen+1}/{generations} ; loss: {loss.item():.5f}")
+                log_fn(f"Gen: {gen+1}/{generations} ; loss: {loss.item():.5f}")
         
         # save model n input
         torch.save(model.state_dict(), modelSave) # input full save path
-        print("model saved to models folder.")
+        log_fn("model saved to models folder.")
     
     # cnn detection part    
     elif mode == '4':
-        torch.set_num_threads(os.cpu_count() or 4)
+        cfg = config.CNN
+        torch.set_num_threads(cfg.get("threads") or os.cpu_count())
         load_model = loadPath() # input save path
-        threshold = 0.67 # 0.67 default(cuz why not)
-        sideLen = 128 # scan window size
-        steps = 96 # scanner steps(64 fast, 32 depth)
-        window_history = 5
+        threshold = cfg["threshold"] # 0.67 default(cuz why not)
+        sideLen = cfg["side_len"] # scan window size
+        steps = cfg["steps"] # scanner steps(64 fast, 32 depth)
+        window_history = cfg["window_history"]
         detections_history = []
         
         # checks if path exists..
         if not os.path.exists(load_model):
             raise FileNotFoundError(f"model FNF: {load_model}")
-        print("model/s loaded with input size well")
+        log_fn("model/s loaded with input size well")
         
         model = sussyCNN().to(device)
         model.load_state_dict(torch.load(load_model, map_location=device))
@@ -185,12 +195,15 @@ def main(mode):
             max_conf = 0.0
             max_xy = (0,0)
             
+            if stop_fn and stop_fn():
+                log_fn("train stopped by user")
+                return
+            
             # window scanning
             for y in range(0, frame.shape[0] - sideLen, steps):
                 for x in range(0, frame.shape[1]-sideLen, steps):
                     patch = frame[y:y+sideLen, x:x+sideLen]
-                    color_patch = cv2.cvtColor(patch, cv2.COLOR_BGRA2BGR)
-                    permuted = torch.tensor(color_patch/255, dtype=torch.float32).permute(2,0,1)
+                    permuted = torch.tensor(patch/255, dtype=torch.float32).permute(2,0,1)
                     patches.append(permuted)
                     coords.append((x,y))
                     
@@ -242,15 +255,19 @@ def main(mode):
             if avg_conf >= threshold:
                 x,y = max_xy
                 cv2.rectangle(frame, (x,y), (x+sideLen, y+sideLen), (0,255,0),2)
-                print(f"sussy maybe found..? average conf lvl: {max_conf:.3f}, max conf lvl:{max_conf:.3f}")
+                log_fn(f"sussy maybe found..? avg=({max_conf:.3f}), max=({max_conf:.3f})")
             else:
-                print(f"no sussy :( avg=({avg_conf:.3f}), max=({max_conf:.3f}) ")  
+                log_fn(f"no sussy :( avg=({avg_conf:.3f}), max=({max_conf:.3f}) ")  
             preview = cv2.resize(frame, (1280,720))
-            cv2.imshow("bleh twan detection(CNN)", preview)
+            
+            if frame_fn:
+                frame_fn(preview)
+            else:
+                cv2.imshow("bleh twan detection(CNN)", preview)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
             
         cv2.destroyAllWindows()
 
-    else: print('Invalid mode..')
+    else: log_fn('Invalid mode..')
 
