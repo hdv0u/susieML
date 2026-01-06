@@ -43,9 +43,9 @@ class denseSussyML:
                     # test BCE incase im lost
                     test_loss = -np.mean(y_test * np.log(pred_test + self.epsilon) +
                                          (1-y_test) * np.log(1-pred_test + self.epsilon))
-                    print(f"gen:{gen}, train loss:{loss:.5f}, test loss:{test_loss:.5f}")
+                    log_fn(f"gen:{gen}, train loss:{loss:.5f}, test loss:{test_loss:.5f}")
                 else:
-                    print(f"gen:{gen}, train loss:{loss:.5f}")
+                    log_fn(f"gen:{gen}, train loss:{loss:.5f}")
     def predict(self, X):
         return self.forward(X)
     
@@ -59,7 +59,7 @@ class denseSussyML:
         self.biasdense2 = data['b2']
 
 # input moved out to main
-def main(mode):
+def main(mode, log_fn=print, frame_fn=None , progress_fn=None, stop_fn=None):
     
     if mode == "1":
         saved_model = save_model()
@@ -68,12 +68,12 @@ def main(mode):
         if isinstance(train_path, tuple):
             train_path = train_path[0]
         if len(train_path) == 0:
-            print("No files selected. susie out")
+            log_fn("No files selected. susie out")
             exit()
         # assign label on file/folder
         train_labels = [[1] if 'pos' in p.lower() else [0] for p in train_path]
-        print("Training paths:", train_path.flatten())
-        print("Training labels:", train_labels)
+        log_fn("Training paths:", train_path.flatten())
+        log_fn("Training labels:", train_labels)
         
         train_input, checker_train = new_augment(train_path, train_labels, augment_count=10, mode='dense')
         # test input
@@ -99,7 +99,7 @@ def main(mode):
         if not os.path.exists(modelPath):
             raise FileNotFoundError(f"model file not found: {modelPath}")
         nn.load_weights(modelPath)
-        print("weights loaded well!")
+        log_fn("weights loaded well!")
         # screenrec thing
         sct = mss.mss()
         monitor = sct.monitors[1]
@@ -119,7 +119,7 @@ def main(mode):
             
             if pred >= threshold and current_time - lastDetectionTime > cooldown:
                 lastDetectionTime = current_time
-                print(f"sussy maybe found..? confidence lvl: {pred:.2f}")
+                log_fn(f"sussy maybe found..? confidence lvl: {pred:.2f}")
                 # some visual feedback
                 cv2.putText(frame, f"Detected! {pred:.2f}", (50, 50),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
@@ -130,4 +130,4 @@ def main(mode):
             cv2.imshow("bleh twan detection", frame)
             if cv2.waitKey(1) & 0xFF == ord("q"): break
         cv2.destroyAllWindows()
-    else: print("hell naw..")
+    else: log_fn("hell naw..")

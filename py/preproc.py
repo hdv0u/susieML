@@ -27,9 +27,9 @@ def image_proc(input_data, size=(128,128), augment=False, debug=False,
                 ty = random.randint(-maxShift, maxShift)
                 m = np.float32([[1,0,tx],[0,1,ty]])
                 img = cv2.warpAffine(img, m, (width, height))
-            if random.random() > 0.75:
-                noise = np.random.normal(0, 8, img.shape)
-                img = np.clip(img + noise, 0, 255).astype(np.uint8)
+            #if random.random() > 0.75:
+            #    noise = np.random.normal(0, 8, img.shape)
+            #    img = np.clip(img + noise, 0, 255).astype(np.uint8)
         # resize and normalize
         img = cv2.resize(img, size)
         img = img.astype('float32') / 255.0 if normalize else img.astype('float32')
