@@ -2,6 +2,7 @@ import torch, cv2, mss, os
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+import config
 from shared import outputImgP, savePath, loadPath
 from preproc import new_augment
 
@@ -89,13 +90,13 @@ class sussyResNet(nn.Module):
         return x
         
 
-def main(mode):
+def main(mode, log_fn=print, frame_fn=None, progress_fn=None, stop_fn=None):
     multi_class = False
     num_class = 1
     
     if multi_class:
         num_class = int(input("class count: "))
-    device = "cuda" if torch.cuda.is_available() else "cpu"; print(f"using {device}")
+    device = "cuda" if torch.cuda.is_available() else "cpu"; log_fn(f"using {device}")
     model = sussyResNet(layers=[3,4,6,3], num_class=num_class).to(device)
     # train
     if mode == "5":
@@ -104,11 +105,11 @@ def main(mode):
         if isinstance(train_path, tuple):
             train_path = train_path[0]
         if len(train_path) == 0:
-            print("no files :(")
+            log_fn("no files :(")
             exit() 
         train_labels = [[1] if 'pos' in p.lower() else [0] for p in train_path]
-        print("Training paths: ", train_path)
-        print("Labels: ", train_labels)
+        log_fn("Training paths: ", train_path)
+        log_fn("Labels: ", train_labels)
         
         train_input, checker_train = new_augment(train_path, train_labels, augment_count=5, mode='cnn')
         epsilon = 0.05
@@ -156,11 +157,11 @@ def main(mode):
                 epoch_loss += loss.item() * batch_X.size(0)
             avg_loss = epoch_loss / num_samples
             if gen % 1 == 0:
-                print(f"Gen: {gen+1}/{generations} ; loss: {avg_loss:.5f}")
+                log_fn(f"Gen: {gen+1}/{generations} ; loss: {avg_loss:.5f}")
         
         # save model n input
         torch.save(model.state_dict(), modelSave) # input full save path
-        print("model saved to models folder.")
+        log_fn("model saved to models folder.")
     
     # detect(load)
     elif mode == "6":
@@ -175,7 +176,7 @@ def main(mode):
         # checks if path exists..
         if not os.path.exists(load_model):
             raise FileNotFoundError(f"model FNF: {load_model}")
-        print("model/s loaded with input size well")
+        log_fn("model/s loaded with input size well")
         
         model = sussyResNet().to(device)
         model.load_state_dict(torch.load(load_model, map_location=device))
@@ -239,13 +240,16 @@ def main(mode):
             if avg_conf >= threshold:
                 x,y = max_xy
                 cv2.rectangle(frame, (x,y), (x+sideLen, y+sideLen), (0,255,0),2)
-                print(f"sussy maybe found..? average conf lvl: {max_conf:.3f}, max conf lvl:{max_conf:.3f}")
+                log_fn(f"sussy maybe found..? average conf lvl: {max_conf:.3f}, max conf lvl:{max_conf:.3f}")
             else:
-                print(f"no sussy :( avg=({avg_conf:.3f}), max=({max_conf:.3f}) ")  
+                log_fn(f"no sussy :( avg=({avg_conf:.3f}), max=({max_conf:.3f}) ")  
             preview = cv2.resize(frame, (1280,720))
-            cv2.imshow("bleh twan detection(CNN)", preview)
+            if frame_fn:
+                frame_fn(preview)
+            else:
+                cv2.imshow("bleh twan detection(CNN)", preview)
             if cv2.waitKey(1) & 0xFF == ord("q"):
                 break
             
         cv2.destroyAllWindows()
-    else: print("Invalid input cro.")
+    else: log_fn("Invalid input cro.")
