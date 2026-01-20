@@ -17,6 +17,9 @@ This mini-project tool is purely for fun and this is NOT affiliated with dsand00
 All artwork belongs to the respective creator/s.
 Training/Inference speed varies on the local host machine.
 
+## Usage instructions
+For more info, go to [*this link.*](setup.md)
+
 ## Future Plans
 - Make a dedicated UI with customizable parameters
 - Fully implementing multiple-class detection
