@@ -1,5 +1,5 @@
 from inputFilter import getImage, getLabel
-from imagePicker import labeledPicker, save_model, load_model
+from ui.file_dialog import save_model_file, select_model_file, labeled_picker
 # bery vasic for now
 
 imageSizeDefault = 128
@@ -10,11 +10,10 @@ def outputLabel():
     x = outputImg()
     return getLabel(x)
 # window picker(picks pos & neg files respectively)
-def outputImgP():
-    paths, labels = labeledPicker()
-    x = getImage(' '.join(paths))
-    return x, labels
-def savePath():
-    return save_model()
-def loadPath():
-    return load_model()
+def outputImgP(parent=None):
+    paths, labels = labeled_picker(parent=parent)
+    return paths, labels
+def savePath(parent=None):
+    return save_model_file(parent=parent)
+def loadPath(parent=None):
+    return select_model_file(parent=parent)

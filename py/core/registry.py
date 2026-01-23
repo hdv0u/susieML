@@ -1,3 +1,5 @@
+# buttons registry
+# this is where u put them buttons in the UI
 MODELS = {
     "1": {
         "module": "models.densenn",

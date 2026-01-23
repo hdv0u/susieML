@@ -1,4 +1,5 @@
 import torch
+# universal constants(except for denseNN with device)
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 16
 GENERATIONS = 50
@@ -10,7 +11,9 @@ CNN = {
     "threshold": 0.67,
     "side_len": 128,
     "steps": 96,
-    "window_history": 5
+    "window_history": 5,
+    "epsilon": 0.05,
+    "label_smoothing": 0.1,
 }
 DENSE = {
     "input_size": 128*128*3,
