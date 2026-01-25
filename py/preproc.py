@@ -73,16 +73,11 @@ def new_augment(paths, labels, augment_count=5, size=(128,128),
             ys.append(label)
     
     xArr = np.stack(xs).astype(np.float32)
-    
-    labelsample = ys[0]
-    if label_mode == 'auto':
-        if isinstance(labelsample, (list, tuple, np.ndarray)) and np.array(labelsample).ndim >= 1 and np.array(labelsample).size > 1:
-            yArr = np.array(ys, dtype=np.float32)
-        else: yArr = np.array(ys, dtype=np.float32).reshape(-1,1)
+
+    if label_mode == 'cce':
+        yArr = np.array(ys, dtype=np.int64).reshape(-1)
     elif label_mode == "bce":
         yArr = np.array(ys, dtype=np.float32).reshape(-1,1)
-    elif label_mode == 'cce':
-        yArr = np.array(ys, dtype=np.int64).reshape(-1)
     else: raise ValueError("label must be auto/bce/cce")
     
     if return_torch:

@@ -1,22 +1,28 @@
 import torch
+# universal constants(except for denseNN with device)
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 BATCH_SIZE = 16
 GENERATIONS = 50
 LEARNING_RATE = 5e-4
 
-MODEL_SAVE_PATH = "models/"
+MODEL_SAVE_PATH = "py/models/"
 
 CNN = {
     "threshold": 0.67,
     "side_len": 128,
     "steps": 96,
-    "window_history": 5
+    "window_history": 5,
+    "epsilon": 0.05,
+    "label_smoothing": 0.1,
 }
 DENSE = {
     "input_size": 128*128*3,
     "cooldown": 0.5,
     "threshold": 0.5,
-    "channels": 3
+    "channels": 3,
+    "side_len": 128,
+    "steps": 128,
+    "window_history": 1
 }
 RESNET = {
     "threshold": 0.67,
