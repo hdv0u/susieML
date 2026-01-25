@@ -8,7 +8,7 @@ import torch.nn as nn
 from ui.file_dialog import save_model_file, select_model_file, labeled_picker
 
 # the brain; input = 128x128x3
-class sussyCNN(nn.Module):
+class SussyCNN(nn.Module):
     def __init__(self, input_size:int=128, out_channels=1):
         super().__init__()
         self.features = nn.Sequential(
@@ -76,7 +76,6 @@ def main(
     # core imports
     from core.model.convnn_runner import CNNTrainer, CNNInference
     from core.frame_sources import screen_source
-    from core.frame_sinks import pyqt_sink, opencv_sink
     from preproc import new_augment
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -84,7 +83,7 @@ def main(
     torch.backends.cudnn.benchmark = True
     log_fn(f"using {device}")
     
-    model_constructor = sussyCNN
+    model_constructor = SussyCNN
     
     if mode == "3":
         if model_save is None:
@@ -129,21 +128,28 @@ def main(
             log_fn(f"model FNF: {load_model}")
             return
         
-        model = sussyCNN().to(device)
-        model.load_state_dict(torch.load(load_model, map_location=device))
+        from core.registry import validate_model_file
+        out_classes = validate_model_file(load_model, expected_mode=4, log_fn=log_fn)
+        if out_classes is None:
+            log_fn("Checkpoint validation failed")
+            return
+        
+        model = SussyCNN(out_channels=out_classes).to(device)
+        
+        try:
+            saved_state = torch.load(load_model, map_location=device)
+            model.load_state_dict(saved_state)
+        except RuntimeError as e:
+            log_fn(f"Failed to load checkpoint into convnn: {e}")
+            return
+        
         model.eval()
-        backend = CNNInference(model, device, cfg, log_fn=log_fn)
-        if frame_fn:
-            sink = frame_fn
-        elif label_widget is not None:
-            sink = pyqt_sink(label_widget)
-        else:
-            sink = opencv_sink()
+        backend = CNNInference(model, device, cfg, log_fn=log_fn, multi_class=(out_classes>1), num_classes=out_classes)
         
         from core.inference_runner import run_inference
         run_inference(
             frame_source=screen_source,
-            frame_sink=sink,
+            frame_sink=frame_fn,
             backend=backend,
             stop_fn=stop_fn,
             log_fn=log_fn

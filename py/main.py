@@ -1,5 +1,5 @@
 import importlib, sys
-
+from core.frame_sinks import opencv_sink
 # correspond the num with the filename of a new model
 # it should be:
 # {odd}: train x
@@ -13,14 +13,19 @@ MODE_REGISTRY = {
     "6": "resnet1",
 }
 
+DEBUG = '--debug' in sys.argv
+
 def run_mode(mode, log_fn=print, frame_fn=None, progress_fn=None, stop_fn=None, 
              parent=None, model_save=None, train_paths=None, train_labels=None, 
-             load_model=None, multi_class=False, label_widget=None):
+             load_model=None, multi_class=False, label_widget=None, debug=False):
     module_name = MODE_REGISTRY.get(mode)
     if not module_name:
         log_fn("invalid mode")
         return
-    
+    if debug:
+        log_fn(f"debug: running mode {mode}")
+    if frame_fn is None:
+        frame_fn = opencv_sink()
     try:
         mod = importlib.import_module(module_name)
     except Exception as e:
@@ -35,17 +40,17 @@ def run_mode(mode, log_fn=print, frame_fn=None, progress_fn=None, stop_fn=None,
         log_fn=log_fn, 
         progress_fn=progress_fn, 
         stop_fn=stop_fn, 
+        frame_fn=frame_fn,
         parent=parent, 
         model_save=model_save, 
         train_paths=train_paths,
         train_labels=train_labels,
         load_model=load_model,
         multi_class=multi_class,
-        label_widget=label_widget,
-        frame_fn=frame_fn
         )
 
 def cli():    
+    debug = '--debug' in sys.argv
     mode = input(
         "--susieML interface--\n"
         "1 = Train (dense susieML)\n"
@@ -57,7 +62,7 @@ def cli():
         "pick mode: "
     ).strip()
     
-    run_mode(mode)
+    run_mode(mode, debug=debug)
     
 def gui():
     from PyQt5.QtWidgets import QApplication

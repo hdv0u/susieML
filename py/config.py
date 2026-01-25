@@ -5,7 +5,7 @@ BATCH_SIZE = 16
 GENERATIONS = 50
 LEARNING_RATE = 5e-4
 
-MODEL_SAVE_PATH = "models/"
+MODEL_SAVE_PATH = "py/models/"
 
 CNN = {
     "threshold": 0.67,
@@ -19,7 +19,10 @@ DENSE = {
     "input_size": 128*128*3,
     "cooldown": 0.5,
     "threshold": 0.5,
-    "channels": 3
+    "channels": 3,
+    "side_len": 128,
+    "steps": 128,
+    "window_history": 1
 }
 RESNET = {
     "threshold": 0.67,

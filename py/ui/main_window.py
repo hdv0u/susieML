@@ -1,20 +1,23 @@
+from PyQt5.QtGui import (
+    QImage, QPixmap
+)
+import cv2
+from datetime import datetime
 
 # debug: print(f"debug: widget {__name__}")
-
 class TestUI:
     def __init__(self):
         from PyQt5.QtWidgets import (
             QWidget, QLabel, QRadioButton, QPushButton,
-            QVBoxLayout, QButtonGroup, QTextEdit, QProgressBar, QCheckBox
+            QVBoxLayout, QButtonGroup, QTextEdit, QProgressBar, QCheckBox,
         )
         from ui.worker import MLWorker
         from core.registry import MODELS
         from ui.file_dialog import save_model_file, select_model_file, labeled_picker, labeled_picker_multi
-        
         class _W(QWidget):
             pass
         self._widget = _W()
-        self._widget.setWindowTitle("Test UI")
+        self._widget.setWindowTitle("SusieML")
         
         # the layout
         layout = QVBoxLayout(self._widget)
@@ -65,7 +68,8 @@ class TestUI:
         self._widget.show()
         
     def append_log(self, text):
-        self.log.append(text)
+        ts = datetime.now().strftime("%H:%M:%S")
+        self.log.append(f"[{ts}] {text}")
     
     def run(self):
         if self.worker and self.worker.isRunning():
@@ -89,28 +93,32 @@ class TestUI:
         load_model = None
         multi_class = False
         class_names = []
+        # 1,2 for dense
+        train_modes = ('1', '3', '5')
+        infer_modes = ('2', '4', '6')
         
-        if selected_mode == '3':
-            model_save = self._save_model_file(parent=self._widget)
-            if not model_save:
-                self.log.append("no save path selected")
-                self._reset_ui()
-                return
+        if selected_mode in train_modes:
             if self._multi_class_enabled:
                 multi_class = True
-                class_names = ["Positive", "Neutral", "Negative"]
+                class_names = ['Positive', 'Neutral', 'Negative']
             else:
                 multi_class = False
-                class_names = ["Positive", "Negative"]
+                class_names = ['Positive', 'Negative']
             
-            class_map = {name: idx for idx, name in enumerate(class_names)}
             train_paths, labels = self._labeled_picker_multi(class_names=class_names)
             if not train_paths:
                 self.log.append("no training images selected")
                 self._reset_ui()
                 return
             
-        elif selected_mode == '4':
+            if model_save is None:
+                model_save = self._save_model_file(parent=self._widget)
+                if not model_save:
+                    self.log.append('train canceled (no save path)')
+                    self._reset_ui()
+                    return
+                
+        elif selected_mode in infer_modes:
             load_model = self._select_model_file(parent=self._widget)
             if not load_model:
                 self.log.append("no model selected")
@@ -121,15 +129,35 @@ class TestUI:
             mode=selected_mode,
             model_save=model_save,
             train_paths=train_paths,
-            train_labels=labels if selected_mode=='3' else None,
+            train_labels=labels if selected_mode in ('1', '3', '5') else None,
             load_model=load_model,
             multi_class=self._multi_class_enabled,
             label_widget=self.video_label,
         )
+        self.worker.frame.connect(self.update_frame)
         self.worker.log.connect(lambda s: self.log.append(str(s)))
         self.worker.progress.connect(self.progress.setValue)
         self.worker.finished.connect(self.on_done)
+        self.worker.finished.connect(self.worker.deleteLater)
         self.worker.start()
+    
+    def update_frame(self, frame):
+        if frame.shape[2] == 4:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+        elif frame.shape[2] != 3:
+            self.log.append(f"Unexpected channels: {frame.shape[2]}")
+            return
+            
+        h,w,ch = frame.shape
+        qimg = QImage(
+            frame.data,
+            w,h,
+            ch * w,
+            QImage.Format_BGR888
+        )
+        pix = QPixmap.fromImage(qimg)
+        pix = pix.scaled(self.video_label.width(), self.video_label.height(), aspectRatioMode=1)
+        self.video_label.setPixmap(pix)
         
     def stop(self):
         if self.worker:

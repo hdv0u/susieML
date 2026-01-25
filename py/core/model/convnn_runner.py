@@ -9,13 +9,15 @@ from core.dataset import NumpyDataset
 # config.py
 from config import DEVICE, BATCH_SIZE, GENERATIONS, LEARNING_RATE, CNN
 
+# main.py
+from main import DEBUG
 print(f"debug: widget {__name__}")
 
 class CNNTrainer:
     def __init__(self, model_fn, device, cfg=None, log_fn=print, progress_fn=None, stop_fn=None, multi_class=False):
         self.model_fn = model_fn
         self.device = device or DEVICE
-        self.cfg = cfg or CNN
+        self.cfg = cfg or {}
         self.log = log_fn
         self.progress = progress_fn
         self.stop_fn = stop_fn
@@ -101,7 +103,6 @@ class CNNInference:
         self.log = log_fn
         self.multi_class = multi_class
         self.num_classes = num_classes if multi_class else 1
-        
         self.model.eval()
         self.detections_history = []
         
@@ -112,6 +113,37 @@ class CNNInference:
         elif frame.shape[2] != 3:
             raise ValueError(f"Expected 3-channel frame, got {frame.shape[2]} channels")
 
+        if 'side_len' not in self.cfg:
+            return self._dense_step(frame)
+        
+        return self._cnn_step(frame)
+    
+    def _dense_step(self, frame):
+        h, w, _ = frame.shape
+        img = cv2.resize(frame, (128,128))
+        tensor = torch.tensor(img / 255., dtype=torch.float32).permute(2,0,1).unsqueeze(0).to(self.device)
+        
+        with torch.no_grad():
+            out = self.model(tensor)
+            if self.multi_class:
+                preds = torch.softmax(out, dim=1).cpu().numpy()[0]
+            else:
+                preds = torch.sigmoid(out).cpu().numpy()[0]
+                
+        conf_val = max(preds) if self.multi_class else float(preds[0])
+        
+        self.detections_history.append(conf_val)
+        if len(self.detections_history) > 5:
+            self.detections_history.pop(0)
+        avg_conf = sum(self.detections_history)/len(self.detections_history)
+        
+        cv2.putText(frame, f"conf={avg_conf:.2f}", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+        if avg_conf >= self.cfg.get('threshold', 0.5):
+            cv2.putText(frame, "detected", (10,60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+        
+        return frame
+    
+    def _cnn_step(self, frame):
         side = self.cfg["side_len"]
         steps = self.cfg["steps"]
         threshold = self.cfg["threshold"]
@@ -147,43 +179,46 @@ class CNNInference:
         
         preds = torch.stack(preds, dim=0).numpy()
         
-        heatmaps = []
-        if self.multi_class:
-            for cls in range(self.num_classes):
-                heatmaps.append(np.zeros((h,w), dtype=np.float32))
-        else:
-            heatmaps.append(np.zeros((h,w), dtype=np.float32)) 
-            
+        heatmaps = [np.zeros((h,w), dtype=np.float32) for _ in range(self.num_classes if self.multi_class else 1)]
         countmap = np.zeros_like(heatmaps[0])
         max_conf = 0.0
-        max_xy = (0,0)
+        max_xy = (0,0)   
         
         for idx, (x,y) in enumerate(coords):
             if self.multi_class:
                 for cls in range(self.num_classes):
                     conf_val = preds[idx][cls]
                     heatmaps[cls][y:y+side, x:x+side] += conf_val
+                    if conf_val > max_conf:
+                        max_conf = conf_val
+                        max_xy = (x,y)
             else:
-                conf_val = float(np.squeeze(preds[idx]))
+                val = preds[idx]
+                if isinstance(val, (np.ndarray, list)):
+                    conf_val = float(val[0])
+                else:
+                    conf_val = float(val)
                 heatmaps[0][y:y+side, x:x+side] += conf_val
-                
-            countmap[y:y+side, x:x+side] += 1
-            if self.multi_class:
-                cls_id = int(np.argmax(preds[idx]))
-                conf_val_max = float(preds[idx][cls_id])
-                if conf_val_max > max_conf:
-                    max_conf = conf_val_max
-                    max_xy = (x,y)
-            else:
                 if conf_val > max_conf:
                     max_conf = conf_val
-                    max_xy = (x,y)
+                    max_xy = (x,y)    
+            countmap[y:y+side, x:x+side] += 1
         
         for i in range(len(heatmaps)):
             heatmaps[i] /= np.maximum(countmap,1)
             
-        if max_conf >= threshold:
-            x,y = max_xy
-            cv2.rectangle(frame, (x,y), (x+side, y+side), (0,255,0), 2)
-            self.log(f"detection avg/max={max_conf:.3f}")  
+        self.detections_history.append(max_conf)
+        if len(self.detections_history) > window_history:
+            self.detections_history.pop(0)    
+        avg_conf = sum(self.detections_history)/len(self.detections_history)
+            
+        x,y = max_xy
+        cv2.rectangle(frame, (x,y), (x+side, y+side), (0,255,0), 2)
+        cv2.putText(frame, f"conf={avg_conf:.2f}", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+        
+        if avg_conf >= threshold:
+            cv2.putText(frame, "detected", (10,60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+        
+        self.log(f"detection avg/max={max_conf:.3f}")  
+        
         return frame

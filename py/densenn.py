@@ -1,133 +1,104 @@
-# susieML v1 NumPy edition(very inefficient)
+# susieML v2
 # target goal for today:
 # 300x2 train image with learn = 0.01-0.05 and neuron set = 1024
-import cv2, time, os, mss
+import torch, cv2, time, mss, os
 import numpy as np
-from shared import outputImgP
-from preproc import image_proc, new_augment
-from imagePicker import save_model, load_model
+import torch.nn as nn
+import torch.nn.functional as F
+from ui.file_dialog import save_model_file, select_model_file, labeled_picker
+from preproc import new_augment, image_proc
+from core.model.convnn_runner import CNNTrainer, CNNInference
+from core.frame_sources import screen_source
+import config
 
-class denseSussyML:
-    def __init__(self, input_size, hidden_size=512, output_size=1):
-        self.weightbias1 = np.random.randn(input_size, hidden_size) * 0.01
-        self.biasdense1 = np.zeros((hidden_size,))
-        self.weightdense2 = np.random.randn(hidden_size, output_size) * 0.01
-        self.biasdense2 = np.zeros((output_size,))
-        self.epsilon = 1e-9
-    def forward(self, X):
-        self.hidden = np.maximum(0, X @ self.weightbias1 + self.biasdense1) # relu deriv?
-        z = self.hidden @ self.weightdense2 + self.biasdense2
-        return 1 / (1 + np.exp(-z))
-    def backward(self, X, y, learn=0.01):
-        pred = self.forward(X)
-        error = pred - y
-        grad_weight2 = self.hidden.T @ error / X.shape[0]
-        grad_bias2 = np.mean(error, axis=0)
-        d_hidden = (error @ self.weightdense2.T) * (self.hidden > 0)
-        grad_weight1 = X.T @ d_hidden / X.shape[0]
-        grad_bias1 = np.mean(d_hidden, axis=0)
+class DenseSussy(nn.Module):
+    def __init__(self, input_size=128*128*3, hidden_size=512, num_classes=1) -> None:
+        super().__init__()
+        self.flatten = nn.Flatten()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, num_classes)
         
-        self.weightdense2 -= learn * grad_weight2
-        self.biasdense2 -= learn * grad_bias2
-        self.weightbias1 -= learn * grad_weight1
-        self.biasdense1 -= learn * grad_bias1
-        # ahhh BCE cuz if susie yes or no ahhh
-        loss = -np.mean(y * np.log(pred + self.epsilon) + (1-y) * np.log(1-pred + self.epsilon))
-        return loss
-    def train(self, X, y, generations=100, denseLearn=0.01, X_test=None, y_test=None):
-        for gen in range(generations):
-            loss = self.backward(X, y, learn=denseLearn)
-            if gen % 1 == 0:
-                if X_test is not None and y_test is not None:
-                    pred_test = self.forward(X_test)
-                    # test BCE incase im lost
-                    test_loss = -np.mean(y_test * np.log(pred_test + self.epsilon) +
-                                         (1-y_test) * np.log(1-pred_test + self.epsilon))
-                    log_fn(f"gen:{gen}, train loss:{loss:.5f}, test loss:{test_loss:.5f}")
-                else:
-                    log_fn(f"gen:{gen}, train loss:{loss:.5f}")
-    def predict(self, X):
-        return self.forward(X)
+    def forward(self, x):
+        x = self.flatten(x)
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
     
-    def save_weights(self, path="nn_weights.npz"):
-        np.savez(path, w1=self.weightbias1, b1=self.biasdense1, w2=self.weightdense2, b2=self.biasdense2)
-    def load_weights(self, path="nn_weights.npz"):
-        data = np.load(path)
-        self.weightbias1 = data['w1']
-        self.biasdense1 = data['b1']
-        self.weightdense2 = data['w2']
-        self.biasdense2 = data['b2']
-
-# input moved out to main
-def main(mode, log_fn=print, frame_fn=None , progress_fn=None, stop_fn=None):
+def main(
+    mode, log_fn=print, frame_fn=None, progress_fn=None, stop_fn=None,
+    parent=None, model_save=None, train_paths=None, train_labels=None,
+    load_model=None, multi_class=False, label_widget=None
+):
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    cfg = config.DENSE
+    log_fn(f"using {device}")
     
-    if mode == "1":
-        saved_model = save_model()
-        # pick file once
-        train_path = outputImgP()
-        if isinstance(train_path, tuple):
-            train_path = train_path[0]
-        if len(train_path) == 0:
-            log_fn("No files selected. susie out")
-            exit()
-        # assign label on file/folder
-        train_labels = [[1] if 'pos' in p.lower() else [0] for p in train_path]
-        log_fn("Training paths:", train_path.flatten())
-        log_fn("Training labels:", train_labels)
+    if mode == '1':
+        if model_save is None:
+            model_save = save_model_file(parent=parent)
+            if not model_save:
+                log_fn("train canceled (no save path)")
+                return
+            
+        if train_paths is None:
+            train_paths, train_labels = labeled_picker(parent=parent)
+            if not train_paths:
+                log_fn("train canceled (no images)")
+                return
         
-        train_input, checker_train = new_augment(train_path, train_labels, augment_count=10, mode='dense')
-        # test input
-        test_path = []
-        test_labels = [[1]]
-        test_input = np.array([image_proc(p) for p in test_path]).reshape(len(test_path), -1)
-        checker_test = np.array(test_labels).reshape(len(test_path), 1)
-        # start train
-        nn = denseSussyML(input_size=train_input.shape[1])
-        nn.train(train_input, checker_train, generations= 100, X_test=test_input, y_test=checker_test)
-        # save weights for detection
-        nn.save_weights(saved_model)
-
-    elif mode == "2":
-        loaded_model = load_model()
-        modelPath = loaded_model
-        input_size = 128*128*3  # adjusted to preproc
-        cooldown = 0.5
-        threshold = 0.3 # 0.67 as default
-        channels = 3
-        # load model
-        nn = denseSussyML(input_size=input_size)
-        if not os.path.exists(modelPath):
-            raise FileNotFoundError(f"model file not found: {modelPath}")
-        nn.load_weights(modelPath)
-        log_fn("weights loaded well!")
-        # screenrec thing
-        sct = mss.mss()
-        monitor = sct.monitors[1]
-        lastDetectionTime = 0
-        sideLen = int((input_size / channels) ** 0.5)
-        while True:
-            screenshot = np.array(sct.grab(monitor))
-            frame = cv2.cvtColor(screenshot, cv2.COLOR_BGRA2BGR)
-            frame_small = cv2.resize(frame, (sideLen, sideLen)) # match training and norms
+        num_classes = 3 if multi_class else 1
+        model_constructor = lambda: DenseSussy(input_size=cfg["input_size"], hidden_size=512, num_classes=num_classes)
+        trainer = CNNTrainer(
+            model_fn=model_constructor,
+            device=device,
+            cfg=cfg,
+            log_fn=log_fn,
+            progress_fn=progress_fn,
+            stop_fn=stop_fn,
+            multi_class=multi_class
+        )
+        trainer.train_from_paths(
+            train_paths=train_paths,
+            save_path=model_save,
+            augment_fn=new_augment,
+            labels=train_labels
+        )
+        return
+    
+    elif mode == '2':
+        if load_model is None:
+            load_model = select_model_file(parent=parent)
+            if not load_model or not os.path.exists(load_model):
+                log_fn("inference canceled (no model)")
+                return
             
-            X = frame_small.flatten().reshape(1, -1) / 255.0
-            if X.shape[1] != nn.weightbias1.shape[0]:
-                raise ValueError(f"input {X.shape[1]} didnt match the network {nn.weightbias1.shape[0]}")
-            # prediction time
-            pred = nn.predict(X)[0][0]
-            current_time = time.time()
-            
-            if pred >= threshold and current_time - lastDetectionTime > cooldown:
-                lastDetectionTime = current_time
-                log_fn(f"sussy maybe found..? confidence lvl: {pred:.2f}")
-                # some visual feedback
-                cv2.putText(frame, f"Detected! {pred:.2f}", (50, 50),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                cv2.rectangle(frame, (0, 0), (frame.shape[1], frame.shape[0]), (0, 255, 0), 2)
-                time.sleep(0.5)
-                
-            # visual Output
-            cv2.imshow("bleh twan detection", frame)
-            if cv2.waitKey(1) & 0xFF == ord("q"): break
-        cv2.destroyAllWindows()
-    else: log_fn("hell naw..")
+        if not os.path.exists(load_model):
+            log_fn(f"model FNF: {load_model}")
+            return
+        
+        saved_state = torch.load(load_model, map_location=device)
+        fc_key = next((k for k in saved_state if 'fc2.weight' in k), None)
+        if fc_key is None:
+            log_fn("Invalid DenseNN checkpoint")
+            return
+        output_size = saved_state[fc_key].shape[0]
+        log_fn(f"detected output size from model: {output_size}")
+        
+        model = DenseSussy(input_size=cfg['input_size'], hidden_size=512, num_classes=output_size).to(device)
+        model.load_state_dict(saved_state)
+        model.eval()
+        backend = CNNInference(model, device, cfg, log_fn=log_fn, multi_class=(output_size > 1), num_classes=output_size)
+        
+        from core.inference_runner import run_inference
+        run_inference(
+            frame_source=screen_source,
+            frame_sink=frame_fn,
+            backend=backend,
+            stop_fn=stop_fn,
+            log_fn=log_fn
+        )
+        return
+    else:
+        log_fn("Invalid mode..")
+        return
+    
