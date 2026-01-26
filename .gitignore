@@ -15,10 +15,14 @@ checkpoints/
 # misc
 *.mp4
 *.avi
+*.spec
 output/
 results/
 input/
 web/
+venv/
+dist/
+build/
 
 # ide settings
 .vscode/

@@ -138,7 +138,6 @@ class TestUI:
         self.worker.log.connect(lambda s: self.log.append(str(s)))
         self.worker.progress.connect(self.progress.setValue)
         self.worker.finished.connect(self.on_done)
-        self.worker.finished.connect(self.worker.deleteLater)
         self.worker.start()
     
     def update_frame(self, frame):
@@ -166,12 +165,16 @@ class TestUI:
               
     def on_done(self):
         self.status.setText("done")
-        self.run_btn.setEnabled(True)
-        self.stop_btn.setEnabled(False)
-        self.worker = None
+        self._reset_ui()        
+        self._cleanup_worker()
         
     def _reset_ui(self):
         self.status.setText("idle")
         self.run_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
+        
+    def _cleanup_worker(self):
+        if self.worker:
+            self.worker.wait()
+            self.worker = None
             
