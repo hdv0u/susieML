@@ -41,9 +41,9 @@ class TestUI:
         self.multi_class_checkbox.setChecked(False)
         
         self.mode_group = QButtonGroup(self._widget)
-        for mode_id, model_info in MODELS.items():
-            rb = QRadioButton(model_info["label"])
-            self.mode_group.addButton(rb, int(mode_id))
+        for module, mode_label in MODELS.items():
+            rb = QRadioButton(mode_label["label"])
+            self.mode_group.addButton(rb, int(module))
             layout.addWidget(rb)
         
         layout.addWidget(self.video_label)
@@ -66,10 +66,6 @@ class TestUI:
     
     def show(self):
         self._widget.show()
-        
-    def append_log(self, text):
-        ts = datetime.now().strftime("%H:%M:%S")
-        self.log.append(f"[{ts}] {text}")
     
     def run(self):
         if self.worker and self.worker.isRunning():
@@ -89,9 +85,7 @@ class TestUI:
         
         model_save = None
         train_paths = None
-        train_labels = None
         load_model = None
-        multi_class = False
         class_names = []
         # 1,2 for dense
         train_modes = ('1', '3', '5')
@@ -99,10 +93,8 @@ class TestUI:
         
         if selected_mode in train_modes:
             if self._multi_class_enabled:
-                multi_class = True
                 class_names = ['Positive', 'Neutral', 'Negative']
             else:
-                multi_class = False
                 class_names = ['Positive', 'Negative']
             
             train_paths, labels = self._labeled_picker_multi(class_names=class_names)
@@ -148,12 +140,7 @@ class TestUI:
             return
             
         h,w,ch = frame.shape
-        qimg = QImage(
-            frame.data,
-            w,h,
-            ch * w,
-            QImage.Format_BGR888
-        )
+        qimg = QImage(frame.data, w, h, ch * w, QImage.Format_BGR888)
         pix = QPixmap.fromImage(qimg)
         pix = pix.scaled(self.video_label.width(), self.video_label.height(), aspectRatioMode=1)
         self.video_label.setPixmap(pix)

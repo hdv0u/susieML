@@ -144,81 +144,69 @@ class CNNInference:
         return frame
     
     def _cnn_step(self, frame):
+        frame_copy = frame.copy()  # draw on copy to avoid ghosting
         side = self.cfg["side_len"]
         steps = self.cfg["steps"]
         threshold = self.cfg["threshold"]
         window_history = self.cfg.get("window_history", 5)
-        
+
         h, w, _ = frame.shape
-        patches = []
-        coords = []
-        
+        patches, coords = [], []
+
         # window scanning
         for y in range(0, h - side, steps):
             for x in range(0, w - side, steps):
                 patch = frame[y:y+side, x:x+side]
                 if patch.shape[:2] != (side, side):
-                    patch = cv2.resize(patch, (side,side))
+                    patch = cv2.resize(patch, (side, side))
                 tensor = torch.tensor(patch / 255., dtype=torch.float32).permute(2,0,1)
                 patches.append(tensor)
                 coords.append((x,y))
-                
-        if not patches: return frame
-        
-        # prediction part
+
+        if not patches:
+            return frame_copy
+
+        # prediction
         batch_size = self.cfg.get("infer_batch", 8)
         preds = []
         with torch.no_grad():
             for i in range(0, len(patches), batch_size):
                 batch = torch.stack(patches[i:i+batch_size]).to(self.device)
+                out = self.model(batch)
                 if self.multi_class:
-                    out = torch.softmax(self.model(batch), dim=1)
+                    out = torch.softmax(out, dim=1)
                 else:
-                    out = torch.sigmoid(self.model(batch))
+                    out = torch.sigmoid(out)
                 preds.extend(out.cpu())
-        
+
         preds = torch.stack(preds, dim=0).numpy()
-        
-        heatmaps = [np.zeros((h,w), dtype=np.float32) for _ in range(self.num_classes if self.multi_class else 1)]
-        countmap = np.zeros_like(heatmaps[0])
-        max_conf = 0.0
-        max_xy = (0,0)   
-        
-        for idx, (x,y) in enumerate(coords):
-            if self.multi_class:
-                for cls in range(self.num_classes):
-                    conf_val = preds[idx][cls]
-                    heatmaps[cls][y:y+side, x:x+side] += conf_val
-                    if conf_val > max_conf:
-                        max_conf = conf_val
-                        max_xy = (x,y)
-            else:
-                val = preds[idx]
-                if isinstance(val, (np.ndarray, list)):
-                    conf_val = float(val[0])
-                else:
-                    conf_val = float(val)
-                heatmaps[0][y:y+side, x:x+side] += conf_val
-                if conf_val > max_conf:
-                    max_conf = conf_val
-                    max_xy = (x,y)    
-            countmap[y:y+side, x:x+side] += 1
-        
-        for i in range(len(heatmaps)):
-            heatmaps[i] /= np.maximum(countmap,1)
-            
+
+        # find max confidence and where it occurred
+        max_conf, max_xy = 0.0, (0,0)
+        for idx, (x, y) in enumerate(coords):
+            conf_val = float(max(preds[idx])) if self.multi_class else float(preds[idx][0])
+            if conf_val > max_conf:
+                max_conf = conf_val
+                max_xy = (x, y)
+
+        # maintain weighted detection history
         self.detections_history.append(max_conf)
         if len(self.detections_history) > window_history:
-            self.detections_history.pop(0)    
-        avg_conf = sum(self.detections_history)/len(self.detections_history)
-            
-        x,y = max_xy
-        cv2.rectangle(frame, (x,y), (x+side, y+side), (0,255,0), 2)
-        cv2.putText(frame, f"conf={avg_conf:.2f}", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
-        
+            self.detections_history.pop(0)
+        weights = np.linspace(0.1, 1.0, len(self.detections_history))
+        avg_conf = float(np.average(self.detections_history, weights=weights))
+
+        # draw rectangles only if patch exceeds threshold
+        for idx, (x, y) in enumerate(coords):
+            conf_val = float(max(preds[idx])) if self.multi_class else float(preds[idx][0])
+            if conf_val >= threshold:
+                cv2.rectangle(frame_copy, (x, y), (x+side, y+side), (0,255,0), 2)
+
+        # draw top-left text
+        cv2.putText(frame_copy, f"conf={avg_conf:.2f}", (10,30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
         if avg_conf >= threshold:
-            cv2.putText(frame, "detected", (10,60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
-        
-        self.log(f"detection avg/max={max_conf:.3f}")  
-        
-        return frame
+            cv2.putText(frame_copy, "detected", (10,60), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+
+        self.log(f"detection avg/max={avg_conf:.3f}/{max_conf:.3f}")
+
+        return frame_copy

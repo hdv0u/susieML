@@ -1,6 +1,6 @@
 import cv2, csv, random, torch
 import numpy as np
-import shared
+import config
 # screen recorder(for future dsand runs)
 # see torchML at elif == 4
 
@@ -78,7 +78,7 @@ def new_augment(paths, labels, augment_count=5, size=(128,128),
         yArr = np.array(ys, dtype=np.int64).reshape(-1)
     elif label_mode == "bce":
         yArr = np.array(ys, dtype=np.float32).reshape(-1,1)
-    else: raise ValueError("label must be auto/bce/cce")
+    else: raise ValueError("label must be binary or multi-class")
     
     if return_torch:
         xT = torch.tensor(xArr, dtype=torch.float32)

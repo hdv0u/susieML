@@ -1,6 +1,3 @@
-from convnn import SussyCNN
-from densenn import DenseSussy
-from resnet1 import SussyResNet
 # buttons registry
 # this is where u put them buttons in the UI
 MODELS = {
@@ -63,22 +60,18 @@ def validate_model_file(load_model, expected_mode, log_fn=print):
     
     module_name = MODELS[str(expected_mode)]['module']
     arch_detected = detect_arch_from_state(state_dict)
-    
     if arch_detected is None:
         log_fn("unable to detect architecture from checkpoint keys")
         return None
-    
     if arch_detected != module_name:
         log_fn(f"Architecture mismatch: expected {module_name}, found {arch_detected}")
         return None
-    
     
     out_classes = None
     for key in state_dict.keys():
         if 'fc.weight' in key or 'classifier.weight' in key or 'fc2.weight' in key:
             out_classes = state_dict[key].shape[0]
-            break
-        
+            break    
     if out_classes is None:
         log_fn("Cannot detect output classes from checkpoint")
         return None

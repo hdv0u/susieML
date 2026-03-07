@@ -48,9 +48,8 @@ def run_mode(mode, log_fn=print, frame_fn=None, progress_fn=None, stop_fn=None,
         load_model=load_model,
         multi_class=multi_class,
         )
-
+# fixing cli soon
 def cli():    
-    debug = '--debug' in sys.argv
     mode = input(
         "--susieML interface--\n"
         "1 = Train (dense susieML)\n"
@@ -62,7 +61,7 @@ def cli():
         "pick mode: "
     ).strip()
     
-    run_mode(mode, debug=debug)
+    run_mode(mode, debug=DEBUG)
     
 def gui():
     from PyQt5.QtWidgets import QApplication
@@ -70,8 +69,8 @@ def gui():
     if not app:
         app = QApplication.instance()
     
-    from ui.main_window import TestUI
-    window = TestUI()
+    from ui.window_test import TestWindow
+    window = TestWindow()
     window.show()
     sys.exit(app.exec_())
 

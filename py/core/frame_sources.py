@@ -1,4 +1,4 @@
-import mss, numpy as np, cv2
+import mss, numpy as np
 
 def screen_source():
     sct = mss.mss()
