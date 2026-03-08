@@ -7,9 +7,6 @@ from PyQt5.QtGui import (
 )
 from PyQt5.QtCore import Qt
 import cv2
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
 from core.registry import MODELS
 from ui.worker import MLWorker
 from ui.file_dialog import save_model_file, select_model_file, labeled_picker, labeled_picker_multi
