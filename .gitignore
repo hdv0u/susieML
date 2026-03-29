@@ -23,6 +23,7 @@ web/
 venv/
 dist/
 build/
+test.*
 
 # ide settings
 .vscode/

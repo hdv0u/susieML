@@ -10,6 +10,7 @@ import cv2
 from core.registry import MODELS
 from ui.worker import MLWorker
 from ui.file_dialog import save_model_file, select_model_file, labeled_picker, labeled_picker_multi
+from config import update_settings
 class TestWindow(QWidget):
     def __init__(self) -> None:
         super().__init__()
@@ -168,9 +169,9 @@ class TestWindow(QWidget):
         
         # setting buttons
         self.threshold.valueChanged.connect(lambda val: self.on_spin_changed("threshold", val)) # name, value
-        self.side_len.valueChanged.connect(lambda val: self.on_spin_changed("side len", val))
+        self.side_len.valueChanged.connect(lambda val: self.on_spin_changed("side_len", val))
         self.steps.valueChanged.connect(lambda val: self.on_spin_changed("steps", val))
-        self.arch_depth.valueChanged.connect(lambda val: self.on_spin_changed("arch depth", val))
+        self.arch_depth.valueChanged.connect(lambda val: self.on_spin_changed("arch_depth", val))
     
     def update_frame(self, frame):
         if frame.shape[2] == 4:
@@ -192,6 +193,9 @@ class TestWindow(QWidget):
     def run(self):
         if self.worker and self.worker.isRunning():
             return
+        
+        update_settings(self.get_settings())
+        
         if self.stack.currentIndex() == 1:
             selected_id = self.train_mode_group.checkedId()
         else:
@@ -275,6 +279,7 @@ class TestWindow(QWidget):
     # settings logic part
     def on_spin_changed(self, name, value):
         self.settings[name] = value
+        update_settings({name: value})
         print(self.settings)
 
     def get_settings(self):
