@@ -1,6 +1,5 @@
-# susie cnn v1.01
-# fixed confidence output issues
-# plan is to add app-like support
+# susie cnn v1.2
+# c1 can do 200-1,000 images, c2 can do 1,000-5,000, c3 can do 5,000-15,000, c4 can do 15,000-50,000, c5 can do 50,000-200,000
 
 import torch
 import torch.nn as nn
