@@ -11,6 +11,7 @@ DEFAULT_SETTINGS = {
     "threshold": 0.67,
     "side_len": 128,
     "steps": 96,
+    "arch_depth": 5,
 }
 
 def update_settings(settings: dict):
@@ -34,10 +35,16 @@ def update_settings(settings: dict):
         DENSE["steps"] = settings["steps"]
         RESNET["steps"] = settings["steps"]
 
+    if "arch_depth" in settings:
+        CNN["arch_depth"] = settings["arch_depth"]
+        DENSE["arch_depth"] = settings["arch_depth"]
+        RESNET["arch_depth"] = settings["arch_depth"]
+
 CNN = {
     "threshold": DEFAULT_SETTINGS["threshold"],
     "side_len": DEFAULT_SETTINGS["side_len"],
     "steps": DEFAULT_SETTINGS["steps"],
+    "arch_depth": DEFAULT_SETTINGS["arch_depth"],
     "window_history": 5,
     "epsilon": 0.05,
     "label_smoothing": 0.1,
@@ -49,11 +56,13 @@ DENSE = {
     "channels": 3,
     "side_len": DEFAULT_SETTINGS["side_len"],
     "steps": DEFAULT_SETTINGS["steps"],
+    "arch_depth": DEFAULT_SETTINGS["arch_depth"],
     "window_history": 1
 }
 RESNET = {
     "threshold": DEFAULT_SETTINGS["threshold"],
     "side_len": DEFAULT_SETTINGS["side_len"],
     "steps": DEFAULT_SETTINGS["steps"],
+    "arch_depth": DEFAULT_SETTINGS["arch_depth"],
     "window_history": 5,
 }

@@ -1,8 +1,7 @@
-import torch, os
+import torch, os, re
 import torch.nn as nn
 from core.model.convnn_runner import CNNTrainer, CNNInference
 from core.frame_sources import screen_source
-from ui.file_dialog import save_model_file, select_model_file, labeled_picker
 from preproc import new_augment
 import config
 class Bottleneck(nn.Module):
@@ -87,17 +86,43 @@ class SussyResNet(nn.Module):
         x = torch.flatten(x, 1)
         x = self.fc(x)
         return x
-    
+        
+def _normalize_state_dict(state_dict):
+    if any(k.startswith("module.") for k in state_dict):
+        return {k[7:]: v for k, v in state_dict.items()}
+    return state_dict
+
+# attempt to infer ResNet depth from checkpoint by checking layer keys
+def infer_resnet_depth_from_state(state_dict, log_fn=print):
+    state_dict = _normalize_state_dict(state_dict)
+    depths = []
+    for layer in range(1, 5):
+        indices = {
+            int(m.group(1))
+            for k in state_dict
+            for m in [re.match(rf"layer{layer}\.(\d+)\.", k)]
+            if m
+        }
+        if indices:
+            depths.append(max(indices) + 1)
+    if not depths:
+        log_fn("Unable to infer ResNet depth from checkpoint")
+        return None
+    return max(depths)
+
 def main(
     mode, log_fn=print, frame_fn=None, progress_fn=None, stop_fn=None,
     parent=None, model_save=None, train_paths=None, train_labels=None,
-    load_model=None, multi_class=False, label_widget=None
+    load_model=None, multi_class=False, label_widget=None, arch_depth=None
 ):
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     cfg = config.RESNET
+    depth = max(1, min(8, arch_depth or cfg.get('arch_depth', 3)))
     log_fn(f"using {device}")
     
     if mode == '5':
+        from ui.file_dialog import save_model_file, labeled_picker
+
         if model_save is None:
             model_save = save_model_file(parent=parent)
             if not model_save:
@@ -111,7 +136,7 @@ def main(
                 return
             
         num_classes = 3 if multi_class else 1
-        model_constructor = lambda: SussyResNet(num_class=num_classes) 
+        model_constructor = lambda: SussyResNet(layers=[depth, depth, depth, depth], num_class=num_classes) 
         trainer = CNNTrainer(
             model_fn=model_constructor,
             device=device,
@@ -130,6 +155,8 @@ def main(
         return
     
     elif mode == '6':
+        from ui.file_dialog import select_model_file
+
         if load_model is None:
             load_model = select_model_file(parent=parent)
             if not load_model or not os.path.exists(load_model):
@@ -137,15 +164,20 @@ def main(
                 return
         
         saved_state = torch.load(load_model, map_location=device)
+        saved_state = _normalize_state_dict(saved_state)
         fc_key = next((k for k in saved_state if 'fc.weight' in k), None)
         if fc_key is None:
             log_fn("Invalid ResNet checkpoint")
             return
-        output_size = saved_state['fc.weight'].shape[0]
-        log_fn(f"detected output size from model: {output_size}")
+        output_size = saved_state[fc_key].shape[0]
+        saved_depth = infer_resnet_depth_from_state(saved_state, log_fn=log_fn)
+        if saved_depth is None:
+            return
+        if saved_depth != depth:
+            log_fn(f"Using checkpoint depth {saved_depth} instead of requested {depth}")
         
-        model = SussyResNet(num_class=output_size).to(device)
-        model.load_state_dict(torch.load(load_model, map_location=device))
+        model = SussyResNet(layers=[saved_depth, saved_depth, saved_depth, saved_depth], num_class=output_size).to(device)
+        model.load_state_dict(saved_state)
         model.eval()
         backend = CNNInference(model, device, cfg, log_fn=log_fn,multi_class=(output_size>1), num_classes=output_size)
         

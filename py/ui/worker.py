@@ -1,6 +1,8 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 import numpy as np
 from main import DEBUG
+
+# Worker thread for running training and inference without blocking the GUI
 class MLWorker(QThread):
     frame = pyqtSignal(np.ndarray)
     log = pyqtSignal(str)
@@ -9,7 +11,7 @@ class MLWorker(QThread):
     def __init__(
         self, mode, model_save=None, train_paths=None, 
         train_labels=None, load_model=None, multi_class=False,
-        label_widget=None, parent=None):
+        label_widget=None, arch_depth=None, parent=None):
         super().__init__()
         self.mode = mode
         self.model_save = model_save
@@ -17,6 +19,7 @@ class MLWorker(QThread):
         self.train_labels = train_labels
         self.load_model = load_model
         self.multi_class = multi_class
+        self.arch_depth = arch_depth
         self._stop = False
         
     def stop(self):
@@ -46,6 +49,7 @@ class MLWorker(QThread):
             train_labels=self.train_labels,
             load_model=self.load_model,
             multi_class=self.multi_class,
+            arch_depth=self.arch_depth,
         )
         self.finished.emit()
     

@@ -1,3 +1,4 @@
+# inference runner that takes frame_sources, runs inference on each frame using the backend, and sends results to frame_sinks
 def run_inference(frame_source, frame_sink=None, backend=None, stop_fn=lambda: False, log_fn=print):
     log_fn("inference runner started")
     if frame_sink is None:

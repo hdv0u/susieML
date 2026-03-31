@@ -137,8 +137,11 @@ class TestWindow(QWidget):
         self.steps.setRange(1, 1024)
         self.steps.setValue(96)
         self.steps.setSingleStep(2)
-        # model depth(implementing for each architecture soon)
+        # model depth
         self.arch_depth = QSpinBox()
+        self.arch_depth.setRange(1, 8)
+        self.arch_depth.setValue(5)
+        self.arch_depth.setSingleStep(1)
         
         self.back_btn3 = QPushButton("Back")
         layout.addWidget(QLabel("Settings"))
@@ -186,6 +189,7 @@ class TestWindow(QWidget):
         pix = pix.scaled(self.video_label.width(), self.video_label.height(), Qt.KeepAspectRatio, Qt.FastTransformation)
         self.video_label.setPixmap(pix)
     
+    # multi-class if either checkbox is checked
     @property
     def multi_class_enabled(self):
         return (self.m_class_cbox1.isChecked() or self.m_class_cbox2.isChecked())
@@ -254,6 +258,7 @@ class TestWindow(QWidget):
             train_labels=labels,
             load_model=load_model,
             multi_class=self.multi_class_enabled,
+            arch_depth=self.arch_depth.value(),
             label_widget=self.video_label,
         )
         target_log = self.log1 if selected_mode in train_modes else self.log2

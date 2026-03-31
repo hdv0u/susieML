@@ -36,7 +36,7 @@ DEBUG = '--debug' in sys.argv
 
 def run_mode(mode, log_fn=print, frame_fn=None, progress_fn=None, stop_fn=None, 
              parent=None, model_save=None, train_paths=None, train_labels=None, 
-             load_model=None, multi_class=False, label_widget=None, debug=False):
+             load_model=None, multi_class=False, label_widget=None, arch_depth=None, debug=False):
     module_name = MODE_REGISTRY.get(mode)
     if not module_name:
         log_fn("invalid mode")
@@ -68,11 +68,12 @@ def run_mode(mode, log_fn=print, frame_fn=None, progress_fn=None, stop_fn=None,
             train_labels=train_labels,
             load_model=load_model,
             multi_class=multi_class,
+            arch_depth=arch_depth,
         )
     except Exception as e:
         log_fn(f"Exception in {module_name}.main: {e}")
         log_fn(traceback.format_exc())
-# fixing cli soon
+
 def cli():    
     try:
         mode = input(

@@ -30,7 +30,13 @@ MODELS = {
 def get_model_constructor(mode_id):
     return MODELS.get(str(mode_id), {}).get("constructor", None)
 
+def _normalize_state_dict(state_dict):
+    if any(k.startswith('module.') for k in state_dict):
+        return {k[7:]: v for k, v in state_dict.items()}
+    return state_dict
+
 def detect_arch_from_state(state_dict):
+    state_dict = _normalize_state_dict(state_dict)
     # dense
     if any('fc2.weight' in k for k in state_dict):
         return 'models.densenn'

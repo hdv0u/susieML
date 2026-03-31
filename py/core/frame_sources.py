@@ -1,5 +1,6 @@
 import mss, numpy as np
 
+# frame source that captures the screen using mss library
 def screen_source():
     sct = mss.mss()
     monitor = sct.monitors[1]
