@@ -4,9 +4,6 @@
 import torch, os
 import torch.nn as nn
 import torch.nn.functional as F
-from preproc import new_augment
-from core.model.convnn_runner import CNNTrainer, CNNInference
-from core.frame_sources import screen_source
 import config
 
 class DenseSussy(nn.Module):
@@ -47,6 +44,8 @@ def main(
     log_fn(f"using {device}")
     
     if mode == '1':
+        from preproc import new_augment
+        from core.model.convnn_runner import CNNTrainer
         from ui.file_dialog import save_model_file, labeled_picker
 
         if model_save is None:
@@ -81,7 +80,9 @@ def main(
         return
     
     elif mode == '2':
+        from core.model.convnn_runner import CNNInference
         from ui.file_dialog import select_model_file
+        from core.frame_sources import screen_source
 
         if load_model is None:
             load_model = select_model_file(parent=parent)
@@ -107,8 +108,9 @@ def main(
         log_fn(f"detected output size from model: {output_size}, hidden size {hidden_size}")
         
         model = DenseSussy(input_size=cfg['input_size'], hidden_size=hidden_size, num_classes=output_size).to(device)
-        model.load_state_dict(saved_state)
+        model.load_state_dict(saved_state, strict=False)
         model.eval()
+        log_fn("Loaded DenseNN checkpoint (some layers may have been skipped)")
         backend = CNNInference(model, device, cfg, log_fn=log_fn, multi_class=(output_size > 1), num_classes=output_size)
         
         from core.inference_runner import run_inference

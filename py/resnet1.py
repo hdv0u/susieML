@@ -1,8 +1,5 @@
 import torch, os, re
 import torch.nn as nn
-from core.model.convnn_runner import CNNTrainer, CNNInference
-from core.frame_sources import screen_source
-from preproc import new_augment
 import config
 class Bottleneck(nn.Module):
     expansion = 4
@@ -121,6 +118,8 @@ def main(
     log_fn(f"using {device}")
     
     if mode == '5':
+        from core.model.convnn_runner import CNNTrainer
+        from preproc import new_augment
         from ui.file_dialog import save_model_file, labeled_picker
 
         if model_save is None:
@@ -155,7 +154,9 @@ def main(
         return
     
     elif mode == '6':
+        from core.model.convnn_runner import CNNInference
         from ui.file_dialog import select_model_file
+        from core.frame_sources import screen_source
 
         if load_model is None:
             load_model = select_model_file(parent=parent)
@@ -177,8 +178,9 @@ def main(
             log_fn(f"Using checkpoint depth {saved_depth} instead of requested {depth}")
         
         model = SussyResNet(layers=[saved_depth, saved_depth, saved_depth, saved_depth], num_class=output_size).to(device)
-        model.load_state_dict(saved_state)
+        model.load_state_dict(saved_state, strict=False)
         model.eval()
+        log_fn("Loaded ResNet checkpoint (some layers may have been skipped)")
         backend = CNNInference(model, device, cfg, log_fn=log_fn,multi_class=(output_size>1), num_classes=output_size)
         
         from core.inference_runner import run_inference

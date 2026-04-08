@@ -6,13 +6,11 @@ from PyQt5.QtGui import (
     QImage, QPixmap
 )
 from PyQt5.QtCore import Qt
-import cv2
 from core.registry import MODELS
-from ui.worker import MLWorker
-from ui.file_dialog import save_model_file, select_model_file, labeled_picker, labeled_picker_multi
 from config import update_settings
 class TestWindow(QWidget):
     def __init__(self) -> None:
+        from ui.file_dialog import save_model_file, select_model_file, labeled_picker, labeled_picker_multi
         super().__init__()
         layout = QVBoxLayout(self)
         self.stack = QStackedWidget()
@@ -95,7 +93,11 @@ class TestWindow(QWidget):
         self.log2 = QTextEdit(readOnly=True)
         self.log2.setMaximumHeight(100)
         self.back_btn2 = QPushButton("Back")
-        self.progress2 = QProgressBar()
+        # threshold for inference
+        self.threshold = QDoubleSpinBox()
+        self.threshold.setRange(0.01, 1.00)
+        self.threshold.setValue(0.67)
+        self.threshold.setSingleStep(0.01)
         
         controls = QVBoxLayout()
         
@@ -108,7 +110,8 @@ class TestWindow(QWidget):
                 self.radio_btns2.append(rb)
         controls.addWidget(self.m_class_cbox2)
         controls.addWidget(self.log2)
-        controls.addWidget(self.progress2)
+        controls.addWidget(QLabel("Detection Threshold"))
+        controls.addWidget(self.threshold)
         controls.addWidget(self.run_btn)
         controls.addWidget(self.stop_btn2)
         controls.addWidget(self.back_btn2)
@@ -122,11 +125,55 @@ class TestWindow(QWidget):
     def settings_window(self):
         page = QWidget()
         layout = QVBoxLayout(page)
-        # threshold
-        self.threshold = QDoubleSpinBox()
-        self.threshold.setRange(0.01, 1.00)
-        self.threshold.setValue(0.67)
-        self.threshold.setSingleStep(0.01)
+        # general settings(train and inference)
+        # model depth
+        self.arch_depth = QSpinBox()
+        self.arch_depth.setRange(1, 8)
+        self.arch_depth.setValue(5)
+        self.arch_depth.setSingleStep(1)
+        # below is train settings
+        # epoch/generations
+        self.gen = QSpinBox()
+        self.gen.setRange(1, 10000)
+        self.gen.setValue(50)
+        self.gen.setSingleStep(10)
+        # learning rate
+        self.lr = QDoubleSpinBox()
+        self.lr.setRange(1e-6, 1e-1)
+        self.lr.setDecimals(6)
+        self.lr.setValue(5e-4)
+        self.lr.setSingleStep(1e-5)
+        # augmentation count
+        self.augment_count = QSpinBox()
+        self.augment_count.setRange(1, 100)
+        self.augment_count.setValue(5)
+        self.augment_count.setSingleStep(1)
+        # advanced(from preproc)
+        self.horizontal_flip = QCheckBox("Horizontal Flip Augmentation")
+        self.horizontal_flip.setChecked(True)
+        self.brightness_aug = QCheckBox("Brightness Augmentation")
+        self.brightness_aug.setChecked(True)
+        self.rotation_aug = QCheckBox("Shift/Translation Augmentation")
+        self.rotation_aug.setChecked(True)
+        # brightness range controls
+        self.brightness_min = QDoubleSpinBox()
+        self.brightness_min.setRange(0.1, 2.0)
+        self.brightness_min.setDecimals(2)
+        self.brightness_min.setValue(0.8)
+        self.brightness_min.setSingleStep(0.1)
+        self.brightness_max = QDoubleSpinBox()
+        self.brightness_max.setRange(0.1, 2.0)
+        self.brightness_max.setDecimals(2)
+        self.brightness_max.setValue(1.2)
+        self.brightness_max.setSingleStep(0.1)
+        # shift range control
+        self.shift_max = QDoubleSpinBox()
+        self.shift_max.setRange(0.01, 0.5)
+        self.shift_max.setDecimals(2)
+        self.shift_max.setValue(0.1)
+        self.shift_max.setSingleStep(0.01)
+        
+        # below is inference settings
         # side len
         self.side_len = QSpinBox()
         self.side_len.setRange(16, 1024)
@@ -137,23 +184,31 @@ class TestWindow(QWidget):
         self.steps.setRange(1, 1024)
         self.steps.setValue(96)
         self.steps.setSingleStep(2)
-        # model depth
-        self.arch_depth = QSpinBox()
-        self.arch_depth.setRange(1, 8)
-        self.arch_depth.setValue(5)
-        self.arch_depth.setSingleStep(1)
         
         self.back_btn3 = QPushButton("Back")
-        layout.addWidget(QLabel("Settings"))
-        
-        layout.addWidget(QLabel("Threshold")) 
-        layout.addWidget(self.threshold)
+        layout.addWidget(QLabel("Train Settings"))
+        layout.addWidget(QLabel("Architecture Depth"))
+        layout.addWidget(self.arch_depth)
+        layout.addWidget(QLabel("Epochs/Generations"))
+        layout.addWidget(self.gen)
+        layout.addWidget(QLabel("Learning Rate"))
+        layout.addWidget(self.lr)
+        layout.addWidget(QLabel("Augmentation Settings"))
+        layout.addWidget(QLabel("Augment Count (per image)"))
+        layout.addWidget(self.augment_count)
+        layout.addWidget(self.horizontal_flip)
+        layout.addWidget(self.brightness_aug)
+        layout.addWidget(QLabel("Brightness Range"))
+        layout.addWidget(self.brightness_min)
+        layout.addWidget(self.brightness_max)
+        layout.addWidget(self.rotation_aug)
+        layout.addWidget(QLabel("Shift Max (fraction of size)"))
+        layout.addWidget(self.shift_max)
+        layout.addWidget(QLabel("Inference Settings"))
         layout.addWidget(QLabel("Side Len"))
         layout.addWidget(self.side_len)
         layout.addWidget(QLabel("Steps")) 
         layout.addWidget(self.steps)
-        layout.addWidget(QLabel("Architecture Depth"))
-        layout.addWidget(self.arch_depth)
         layout.addWidget(self.back_btn3) 
         
         self.stack.addWidget(page)    
@@ -171,12 +226,23 @@ class TestWindow(QWidget):
         self.stop_btn2.clicked.connect(self.stop)
         
         # setting buttons
-        self.threshold.valueChanged.connect(lambda val: self.on_spin_changed("threshold", val)) # name, value
-        self.side_len.valueChanged.connect(lambda val: self.on_spin_changed("side_len", val))
-        self.steps.valueChanged.connect(lambda val: self.on_spin_changed("steps", val))
-        self.arch_depth.valueChanged.connect(lambda val: self.on_spin_changed("arch_depth", val))
+        self.threshold.valueChanged.connect(lambda value: self.on_spin_changed("threshold", value)) # name, value
+        self.side_len.editingFinished.connect(lambda: self.on_spin_changed("side_len", self.side_len.value()))
+        self.steps.editingFinished.connect(lambda: self.on_spin_changed("steps", self.steps.value()))
+        self.arch_depth.editingFinished.connect(lambda: self.on_spin_changed("arch_depth", self.arch_depth.value()))
+        self.lr.valueChanged.connect(lambda value: self.on_spin_changed("lr", value))
+        self.gen.editingFinished.connect(lambda: self.on_spin_changed("gen", self.gen.value()))
+        self.augment_count.editingFinished.connect(lambda: self.on_spin_changed("augment_count", self.augment_count.value()))
+        self.brightness_min.editingFinished.connect(lambda: self.on_spin_changed("brightness_min", self.brightness_min.value()))
+        self.brightness_max.editingFinished.connect(lambda: self.on_spin_changed("brightness_max", self.brightness_max.value()))
+        self.shift_max.editingFinished.connect(lambda: self.on_spin_changed("shift_max", self.shift_max.value()))
+        self.horizontal_flip.stateChanged.connect(lambda state: self.on_checkbox_changed("flip_enabled", state))
+        self.brightness_aug.stateChanged.connect(lambda state: self.on_checkbox_changed("brightness_enabled", state))
+        self.rotation_aug.stateChanged.connect(lambda state: self.on_checkbox_changed("shift_enabled", state))
+        
     
     def update_frame(self, frame):
+        import cv2
         if frame.shape[2] == 4:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
         elif frame.shape[2] != 3:
@@ -195,6 +261,7 @@ class TestWindow(QWidget):
         return (self.m_class_cbox1.isChecked() or self.m_class_cbox2.isChecked())
     
     def run(self):
+        from ui.worker import MLWorker
         if self.worker and self.worker.isRunning():
             return
         
@@ -212,7 +279,6 @@ class TestWindow(QWidget):
         selected_mode = str(selected_id)
         self.log2.clear()
         self.progress1.setValue(0)
-        self.progress2.setValue(0)
         self.log2.setText("running")
         self.run_btn.setEnabled(False)
         self.stop_btn2.setEnabled(True)
@@ -262,11 +328,11 @@ class TestWindow(QWidget):
             label_widget=self.video_label,
         )
         target_log = self.log1 if selected_mode in train_modes else self.log2
-        target_progress = self.progress1 if selected_mode in train_modes else self.progress2
+        target_progress = self.progress1 if selected_mode in train_modes else None
         
         self.worker.frame.connect(self.update_frame)
         self.worker.log.connect(lambda s: target_log.append(str(s)))
-        self.worker.progress.connect(target_progress.setValue)
+        self.worker.progress.connect(target_progress.setValue) if target_progress else None
         self.worker.finished.connect(self.on_done)
         self.worker.start()
     
@@ -275,11 +341,11 @@ class TestWindow(QWidget):
         if checked:
             print(f"Radio button {index+1} picked")
     
-    def on_checkbox_changed(self, state):
-        if state == 2: # 2 for check, 0 is uncheck
-            print(True)
-        else:
-            print(False)
+    def on_checkbox_changed(self, param_name, state):
+        value = state == 2  # 2 for checked, 0 for unchecked
+        self.settings[param_name] = value
+        update_settings({param_name: value})
+        print(f"{param_name}: {value}")
               
     # settings logic part
     def on_spin_changed(self, name, value):
@@ -287,14 +353,25 @@ class TestWindow(QWidget):
         update_settings({name: value})
         print(self.settings)
 
+    # get all settings at once for convenience
     def get_settings(self):
         return {
             "threshold": self.threshold.value(),
             "side_len": self.side_len.value(),
             "steps": self.steps.value(),
             "arch_depth": self.arch_depth.value(),
+            "lr": self.lr.value(),
+            "gen": self.gen.value(),
+            "augment_count": self.augment_count.value(),
+            "flip_enabled": self.horizontal_flip.isChecked(),
+            "brightness_enabled": self.brightness_aug.isChecked(),
+            "brightness_min": self.brightness_min.value(),
+            "brightness_max": self.brightness_max.value(),
+            "shift_enabled": self.rotation_aug.isChecked(),
+            "shift_max": self.shift_max.value(),
         }
     
+    # the rest of general logic
     def stop(self):
         if self.worker:
             self.worker.stop()

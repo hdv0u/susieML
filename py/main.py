@@ -1,5 +1,4 @@
-import importlib, sys, os, traceback
-from core.frame_sinks import opencv_sink
+import sys, os, traceback
 
 if getattr(sys, 'frozen', False):
     BASE_PATH = sys._MEIPASS
@@ -14,6 +13,7 @@ IMAGES_PATH = os.path.join(BASE_PATH, "images")  # any icons/images
 CONFIG_PATH = os.path.join(BASE_PATH, "configs")
 
 def log(msg, to_file=True):
+    LOG_FILE = os.path.join(BASE_PATH, "log.txt")
     print(msg)
     if to_file:
         with open(LOG_FILE, "a", encoding="utf-8") as f:
@@ -37,6 +37,8 @@ DEBUG = '--debug' in sys.argv
 def run_mode(mode, log_fn=print, frame_fn=None, progress_fn=None, stop_fn=None, 
              parent=None, model_save=None, train_paths=None, train_labels=None, 
              load_model=None, multi_class=False, label_widget=None, arch_depth=None, debug=False):
+    from core.frame_sinks import opencv_sink
+    import importlib
     module_name = MODE_REGISTRY.get(mode)
     if not module_name:
         log_fn("invalid mode")
@@ -73,23 +75,7 @@ def run_mode(mode, log_fn=print, frame_fn=None, progress_fn=None, stop_fn=None,
     except Exception as e:
         log_fn(f"Exception in {module_name}.main: {e}")
         log_fn(traceback.format_exc())
-
-def cli():    
-    try:
-        mode = input(
-            "--susieML interface--\n"
-            "1 = Train (dense susieML)\n"
-            "2 = Find Sussy(dense)\n"
-            "3 = Train (CNN susieML)\n"
-            "4 = Find Sussy(cnn)\n"
-            "5 = Train (ResNet CNN)\n"
-            "6 = Find Sussy(resnet)\n"
-            "pick mode: "
-        ).strip()
-        run_mode(mode, debug=DEBUG)
-    except Exception as e:
-        log(f"CLI Exception: {e}")
-        log(traceback.format_exc())
+        
 def gui():
     from PyQt5.QtWidgets import QApplication
     try:
@@ -107,16 +93,12 @@ def gui():
         raise  # fallback handled in main()
 
 def main():
-    if "--cli" in sys.argv:
-        cli()
-    else:
-        try:
-            gui()
-        except Exception as e:
-            log("GUI failed, fallback to CLI")
-            log(str(e))
-            log(traceback.format_exc())
-            cli()
-    
+    try:
+        gui()
+    except Exception as e:
+        log("GUI failed, fallback to CLI")
+        log(str(e))
+        log(traceback.format_exc())
+       
 if __name__ == "__main__":
     main()

@@ -1,6 +1,5 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 import numpy as np
-from main import DEBUG
 
 # Worker thread for running training and inference without blocking the GUI
 class MLWorker(QThread):
@@ -26,6 +25,7 @@ class MLWorker(QThread):
         self._stop = True
     
     def run(self):
+        from main import DEBUG
         from main import run_mode
         def gui_log(*args, **kwargs):
             text = " ".join(str(a) for a in args)

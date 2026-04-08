@@ -39,8 +39,9 @@ class CNNTrainer:
         
         # augmentation + prepare arrays
         augment_count = self.cfg.get("augment_count", 5)
+        from config import AUGMENT_SETTINGS
         train_input, checker_train = augment_fn(train_paths, labels, augment_count=augment_count,
-                                                mode='cnn', label_mode=label_mode)
+                                                mode='cnn', label_mode=label_mode, augment_cfg=AUGMENT_SETTINGS)
         
         if self.multi_class:
             y = np.array(checker_train).astype(np.int64)
@@ -61,7 +62,7 @@ class CNNTrainer:
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, pin_memory=True)
         
         optimizer = optim.Adam(model.parameters(), lr=self.cfg.get("lr", 5e-4))
-        generations = self.cfg.get("generations", 50)
+        generations = self.cfg.get("gen", 50)
 
         for gen in range(generations):
             model.train()
