@@ -11,7 +11,6 @@
 2. Go to the folder with *"cd SusieML\py"* in the terminal
 3. Install the requirements with *"pip install -r requirements.txt"* in the terminal
 4. After installing the req, run main.py with either *"py main.py"* or *"python main.py"*
-   - 4.1. If either one fails to run the GUI, run the main with the "--cli" tag after it, if it still fails, you must check your current python version and must match from the requirements.
 
 ## **How to use:**
 
