@@ -53,6 +53,22 @@ class TestWindow(QWidget):
     def train_window(self):
         page = QWidget()
         layout = QVBoxLayout(page)
+        self.arch_depth = QSpinBox()
+        self.arch_depth.setRange(1, 8)
+        self.arch_depth.setValue(5)
+        self.arch_depth.setSingleStep(1)
+        # below is train settings
+        # epoch/generations
+        self.gen = QSpinBox()
+        self.gen.setRange(1, 10000)
+        self.gen.setValue(50)
+        self.gen.setSingleStep(10)
+        # learning rate
+        self.lr = QDoubleSpinBox()
+        self.lr.setRange(1e-6, 1e-1)
+        self.lr.setDecimals(6)
+        self.lr.setValue(5e-4)
+        self.lr.setSingleStep(1e-5)
         self.m_class_cbox1 = QCheckBox("Enable Multi-class")
         self.log1 = QTextEdit(readOnly=True)
         self.progress1 = QProgressBar()
@@ -72,6 +88,12 @@ class TestWindow(QWidget):
         layout.addWidget(self.m_class_cbox1)
         layout.addWidget(self.log1)
         layout.addWidget(self.progress1)
+        layout.addWidget(QLabel("Architecture Depth"))
+        layout.addWidget(self.arch_depth)
+        layout.addWidget(QLabel("Epochs/Generations"))
+        layout.addWidget(self.gen)
+        layout.addWidget(QLabel("Learning Rate"))
+        layout.addWidget(self.lr)
         layout.addWidget(self.train_btn)
         layout.addWidget(self.stop_btn1)
         layout.addWidget(self.back_btn1)
@@ -86,7 +108,7 @@ class TestWindow(QWidget):
         self.video_label.setMinimumSize(320, 240)
         self.video_label.setStyleSheet("background-color: black;")
         
-        self.m_class_cbox2 = QCheckBox("Enable Multi-class")
+        self.m_class_cbox2 = QCheckBox("Enable Multi-class(Experimental)")
         self.run_btn = QPushButton("Run")
         self.radio_btns2 = []
         self.stop_btn2 = QPushButton("Stop")
@@ -127,22 +149,7 @@ class TestWindow(QWidget):
         layout = QVBoxLayout(page)
         # general settings(train and inference)
         # model depth
-        self.arch_depth = QSpinBox()
-        self.arch_depth.setRange(1, 8)
-        self.arch_depth.setValue(5)
-        self.arch_depth.setSingleStep(1)
-        # below is train settings
-        # epoch/generations
-        self.gen = QSpinBox()
-        self.gen.setRange(1, 10000)
-        self.gen.setValue(50)
-        self.gen.setSingleStep(10)
-        # learning rate
-        self.lr = QDoubleSpinBox()
-        self.lr.setRange(1e-6, 1e-1)
-        self.lr.setDecimals(6)
-        self.lr.setValue(5e-4)
-        self.lr.setSingleStep(1e-5)
+        
         # augmentation count
         self.augment_count = QSpinBox()
         self.augment_count.setRange(1, 100)
@@ -186,13 +193,6 @@ class TestWindow(QWidget):
         self.steps.setSingleStep(2)
         
         self.back_btn3 = QPushButton("Back")
-        layout.addWidget(QLabel("Train Settings"))
-        layout.addWidget(QLabel("Architecture Depth"))
-        layout.addWidget(self.arch_depth)
-        layout.addWidget(QLabel("Epochs/Generations"))
-        layout.addWidget(self.gen)
-        layout.addWidget(QLabel("Learning Rate"))
-        layout.addWidget(self.lr)
         layout.addWidget(QLabel("Augmentation Settings"))
         layout.addWidget(QLabel("Augment Count (per image)"))
         layout.addWidget(self.augment_count)
