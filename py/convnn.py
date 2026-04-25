@@ -6,7 +6,7 @@ import torch.nn as nn
 
 # the brain; input = 128x128x3
 class SussyCNN(nn.Module):
-    def __init__(self, input_size:int=128, out_channels=1, depth=3):
+    def __init__(self, input_size:int=128, out_channels=1, depth=1):
         super().__init__()
         mult = max(1, depth)
         c1 = 16 * mult
@@ -98,7 +98,7 @@ def main(
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
     cfg = config.CNN
-    depth = max(1, min(8, arch_depth or cfg.get('arch_depth', 5)))
+    depth = max(1, min(8, arch_depth or cfg.get('arch_depth', 1)))
     torch.backends.cudnn.benchmark = True
     log_fn(f"using {device}")
     

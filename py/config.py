@@ -11,7 +11,7 @@ DEFAULT_SETTINGS = {
     "threshold": 0.67,
     "side_len": 128,
     "steps": 96,
-    "arch_depth": 5,
+    "arch_depth": 1,
     "lr": 5e-4,
     "gen": 50,
     "augment_count": 5,

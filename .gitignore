@@ -24,6 +24,7 @@ venv/
 dist/
 build/
 test.*
+datasets/
 
 # ide settings
 .vscode/

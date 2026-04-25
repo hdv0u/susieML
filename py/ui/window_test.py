@@ -55,7 +55,7 @@ class TestWindow(QWidget):
         layout = QVBoxLayout(page)
         self.arch_depth = QSpinBox()
         self.arch_depth.setRange(1, 8)
-        self.arch_depth.setValue(5)
+        self.arch_depth.setValue(1)
         self.arch_depth.setSingleStep(1)
         # below is train settings
         # epoch/generations
