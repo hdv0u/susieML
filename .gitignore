@@ -9,7 +9,7 @@ __pycache__/
 *.npz
 *.pt
 *.pth
-data/
+py/data
 checkpoints/
 
 # misc

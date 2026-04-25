@@ -23,7 +23,8 @@ class TrainEngine:
         loader = DataLoader(
             dataset,
             batch_size=self.cfg["training"]["batch_size"],
-            shuffle=True
+            shuffle=True,
+            pin_memory=True
         )
         return loader
     
@@ -49,6 +50,8 @@ class TrainEngine:
         )
         epochs = override_epochs if override_epochs is not None else self.cfg["training"]["epochs"]
         
+        epsilon = self.cfg["training"].get("epsilon", 0.05)
+        
         for epoch in range(epochs):
             if stop_flag and stop_flag():
                 self.log("Training stopped")
@@ -60,6 +63,8 @@ class TrainEngine:
                 
                 X_batch = X_batch.to(device)
                 y_batch = y_batch.to(device)
+                
+                y_batch = y_batch * (1 - epsilon) + (epsilon / 2) # label smoothing
                 
                 optimizer.zero_grad()
                 

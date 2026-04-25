@@ -320,7 +320,8 @@ class TestWindow(QWidget):
             return
         
         bus.train_requested.emit({
-            "dataset_path": json_path
+            "dataset_path": json_path,
+            "config": self.build_config()
         })
         
         self.log1.append(f"quick train started! {json_path}")
@@ -343,12 +344,11 @@ class TestWindow(QWidget):
             self.log1.append("dataset creation failed")
             return
         
-        config = self.build_config()
-        self.log1.append(json.dumps(config, indent=4))
+        self.log1.append(json.dumps(self.build_config(), indent=4))
             
         bus.train_requested.emit({
             "dataset_path": json_path,
-            "config": config
+            "config": self.build_config()
         })
     
     # build config dict from UI settings
