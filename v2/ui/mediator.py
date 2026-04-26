@@ -5,11 +5,15 @@ from ui.mediator_bus import bus
 from ui.workers.train_worker import TrainWorker
 from ui.workers.infer_worker import InferWorker
 from core.detection.screen_detector import ScreenDetector
+from core.control.run_controller import RunController
+from core.control.config_controller import ConfigController
 class Mediator:
     def __init__(self, cfg, ui=None):
-        self.cfg = cfg
         self.ui = ui
         self.log = self.ui.log1.append
+        self.stop_ctrl = RunController()
+        self.cfg = cfg
+        self.config = ConfigController(self.cfg)
         
         self.trainer = TrainEngine(cfg, log_fn=self.ui.log1.append)
         self.worker = None
@@ -21,6 +25,8 @@ class Mediator:
     def handle_train(self, payload):
         dataset_path = payload["dataset_path"]
         config = payload["config"]
+        
+        self.config.update(config)
         
         run_dir = create_run_dir()
         model_path = run_dir / "model.pt"
@@ -34,7 +40,7 @@ class Mediator:
         with open(config_path, "w") as f:
             json.dump(config, f, indent=4)
         
-        self.trainer = TrainEngine(config, log_fn=self.log)
+        self.trainer = TrainEngine(self.config, log_fn=self.log)
           
         self.worker = TrainWorker(
             trainer=self.trainer,
@@ -42,7 +48,8 @@ class Mediator:
                 "dataset_path": str(dataset_out_path),
                 "save_path": str(model_path),
                 "epochs": config["training"]["epochs"]
-            }
+            },
+            stop_ctrl=self.stop_ctrl
         )
 
         self.worker.log.connect(self.ui.log1.append)
@@ -50,28 +57,41 @@ class Mediator:
         
         self.worker.start()
             
-    def handle_run(self, model_path):
-        engine = InferEngine(self.cfg, model_path, log_fn=self.ui.log2.append)
+    def handle_run(self, payload):
+        model_path = payload["model_path"]
+        config = payload["config"]
+        
+        self.config.update(config)
+        if self.worker:
+            self.stop_ctrl.stop()
+            self.worker.wait()
+            self.worker = None
+        
+        self.stop_ctrl.reset()
+        
+        engine = InferEngine(self.config, model_path, log_fn=self.ui.log2.append)
+        
         self.detector = ScreenDetector(
             engine=engine,
-            cfg=self.cfg
+            cfg=self.config
         )
         
         if hasattr(self, "worker") and self.worker:
             self.worker.stop()
             
-        self.worker = InferWorker(self.detector)
+        self.worker = InferWorker(self.detector, self.stop_ctrl)
         
         self.worker.frame_ready.connect(self.ui.update_frame)
         self.worker.log.connect(self.ui.log2.append)
         self.worker.start()
         
-        if self.ui:
-            self.ui.log2.append(f"Model loaded {model_path}")
+        self.ui.log2.append(f"Model loaded {model_path}")
             
     def handle_stop(self):
-        if hasattr(self, "worker") and self.worker:
-            self.worker.stop()
+        if self.stop_ctrl:
+            self.stop_ctrl.stop()
+        
+        if self.worker:
             self.worker.wait()
         
         if self.ui:

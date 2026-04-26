@@ -242,8 +242,8 @@ class TestWindow(QWidget):
         self.train_btn.clicked.connect(self.on_train)
         self.run_btn.clicked.connect(self.run)
 
-        self.stop_btn1.clicked.connect(self.stop)
-        self.stop_btn2.clicked.connect(self.stop)
+        self.stop_btn1.clicked.connect(lambda: bus.stop_requested.emit())
+        self.stop_btn2.clicked.connect(lambda: bus.stop_requested.emit())
     
     # makes JSON from pos and neg, saves and returns path, for quick train
     def json_gen(self):
@@ -335,7 +335,10 @@ class TestWindow(QWidget):
         )
         
         if model_path:
-            bus.run_requested.emit(model_path)
+            bus.run_requested.emit({
+                "model_path": model_path,
+                "config": self.build_config()
+            })
 
     def on_train(self):
         json_path = self.json_gen()

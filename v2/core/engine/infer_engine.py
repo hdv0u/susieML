@@ -12,7 +12,7 @@ class InferEngine:
             "cuda" if torch.cuda.is_available() else "cpu"
         )
         self.model = SussyCNN(
-            out_channels=self.cfg["model"]["out_channels"]
+            out_channels=self.cfg.get_value("model", "out_channels")
         ).to(self.device)
         self.model.load_state_dict(
             torch.load(model_path, map_location=self.device)

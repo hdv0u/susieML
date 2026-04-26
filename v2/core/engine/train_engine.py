@@ -34,7 +34,7 @@ class TrainEngine:
         )
         return model
     
-    def train(self, dataset_path, save_path, stop_flag=None, progress_fn=None, override_epochs=None):
+    def train(self, dataset_path, save_path, stop_ctrl=None, progress_fn=None, override_epochs=None):
         
         device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
@@ -46,20 +46,23 @@ class TrainEngine:
         
         optimizer = optim.Adam(
             model.parameters(),
-            lr=self.cfg["training"]["learning_rate"]
+            lr=self.config.get_value("training", "learning_rate")
         )
-        epochs = override_epochs if override_epochs is not None else self.cfg["training"]["epochs"]
+        epochs = self.config.get_value("training", "epochs")
         
         epsilon = self.cfg["training"].get("epsilon", 0.05)
         
         for epoch in range(epochs):
-            if stop_flag and stop_flag():
+            if stop_ctrl and stop_ctrl.is_stopped():
                 self.log("Training stopped")
                 return
             model.train()
             total_loss = 0.0
             
             for X_batch, y_batch in loader:
+                if stop_ctrl and stop_ctrl.is_stopped():
+                    self.log("Training stopped")
+                    return
                 
                 X_batch = X_batch.to(device)
                 y_batch = y_batch.to(device)

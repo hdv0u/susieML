@@ -29,6 +29,7 @@ INFERENCE = {
     "threshold": 0.67,
     "side_len": 128,
     "steps": 96,
+    "batch_size": 4,
 }
 
 GLOBAL = {

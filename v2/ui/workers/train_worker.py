@@ -5,16 +5,17 @@ class TrainWorker(QThread):
     log = pyqtSignal(str)
     progress = pyqtSignal(int)
     
-    def __init__(self, trainer, payload):
+    def __init__(self, trainer, payload, stop_ctrl):
         super().__init__()
         self.trainer = trainer
         self.payload = payload
-        self._stop_flag = False
+        self.stop_ctrl = stop_ctrl
         
     def stop(self):
-        self._stop_flag = True
+        self.stop_ctrl.stop()
         
     def run(self):
+        self.stop_ctrl.reset()
         # logs and emit them to UI
         def logger(msg):
             self.log.emit(str(msg))
@@ -30,7 +31,7 @@ class TrainWorker(QThread):
         self.trainer.train(
             dataset_path=dataset_path,
             save_path=save_path,
-            stop_flag=lambda: self._stop_flag,
+            stop_ctrl=self.stop_ctrl,
             progress_fn=self.progress.emit,
             override_epochs=epochs
         )
