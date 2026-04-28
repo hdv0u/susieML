@@ -1,8 +1,5 @@
 import torch
-import cv2
-import numpy as np
 from models.convnn import SussyCNN
-from data.preproc import load_image, preprocess
 class InferEngine:
     def __init__(self, cfg, model_path, log_fn=print):
         self.cfg = cfg

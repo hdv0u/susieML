@@ -9,6 +9,7 @@ TRAINING = {
     "epochs": 50,
     "batch_size": 16,
     "learning_rate": 5e-4,
+    "epsilon": 0.05,
     "optimizer": "adam",
     "loss": "bce_with_logits",
     "shuffle": True,

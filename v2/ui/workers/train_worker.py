@@ -7,7 +7,6 @@ class TrainWorker(QThread):
     
     def __init__(self, trainer, payload, stop_ctrl):
         super().__init__()
-        self.trainer = trainer
         self.payload = payload
         self.stop_ctrl = stop_ctrl
         
@@ -19,19 +18,6 @@ class TrainWorker(QThread):
         # logs and emit them to UI
         def logger(msg):
             self.log.emit(str(msg))
-            
-        self.trainer.log = logger
         
-        dataset_path = self.payload["dataset_path"]
-        save_path = self.payload["save_path"]
-        
-        epochs = self.payload.get("epochs", None)
-        
-        # send progress updates to the UI using the progress signal
-        self.trainer.train(
-            dataset_path=dataset_path,
-            save_path=save_path,
-            stop_ctrl=self.stop_ctrl,
-            progress_fn=self.progress.emit,
-            override_epochs=epochs
-        )
+        runner = self.payload["runner"]
+        runner(self.progress.emit)

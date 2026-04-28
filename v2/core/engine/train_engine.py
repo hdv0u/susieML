@@ -22,7 +22,7 @@ class TrainEngine:
         dataset = list(zip(X, y))
         loader = DataLoader(
             dataset,
-            batch_size=self.cfg["training"]["batch_size"],
+            batch_size=self.cfg.get_value("training", "batch_size"),
             shuffle=True,
             pin_memory=True
         )
@@ -30,7 +30,7 @@ class TrainEngine:
     
     def _build_model(self):
         model = SussyCNN(
-            out_channels=self.cfg["model"]["out_channels"]
+            out_channels=self.cfg.get_value("model", "out_channels")
         )
         return model
     
@@ -46,21 +46,21 @@ class TrainEngine:
         
         optimizer = optim.Adam(
             model.parameters(),
-            lr=self.config.get_value("training", "learning_rate")
+            lr=self.cfg.get_value("training", "learning_rate")
         )
-        epochs = self.config.get_value("training", "epochs")
+        epochs = override_epochs or self.cfg.get_value("training", "epochs")
         
-        epsilon = self.cfg["training"].get("epsilon", 0.05)
+        epsilon = self.cfg.get_value("training", "epsilon")
         
         for epoch in range(epochs):
-            if stop_ctrl and stop_ctrl.is_stopped():
+            if stop_ctrl and stop_ctrl.stop():
                 self.log("Training stopped")
                 return
             model.train()
             total_loss = 0.0
             
             for X_batch, y_batch in loader:
-                if stop_ctrl and stop_ctrl.is_stopped():
+                if stop_ctrl and stop_ctrl.stop():
                     self.log("Training stopped")
                     return
                 

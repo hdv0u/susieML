@@ -13,7 +13,7 @@ def load_image(path):
 
 def preprocess(img, cfg):
     # resize and normalize
-    img = cv2.resize(img, tuple(cfg["model"]["input_size"]))
+    img = cv2.resize(img, tuple(cfg.get_value("model", "input_size")))
     img = img.astype('float32') / 255.0
     
     img = np.transpose(img, (2,0,1))
@@ -22,7 +22,7 @@ def preprocess(img, cfg):
 def process_image(path, cfg, augment=False):
     img = load_image(path)
     if augment:
-        img = apply_augment(img, cfg["augment"])
+        img = apply_augment(img, cfg.get()["augment"])
     img = preprocess(img, cfg)
     return img
 
@@ -52,7 +52,7 @@ def apply_augment(img, aug_cfg):
 def build_dataset(paths, labels, cfg):  
     xs, ys = [],[]
     
-    augment_count = cfg["augment"]["augment_count"]
+    augment_count = cfg.get_value("augment", "augment_count")
     
     for path, label in zip(paths, labels):
         xs.append(process_image(path, cfg, augment=False))  
