@@ -8,8 +8,35 @@ class ScreenDetector:
         self.cfg = cfg
         self.history = []
         self.sync_config()
+    
+    def _detect_fcn(self, frame):
+        self.sync_config()
+        img = cv2.resize(frame, (self.side, self.side))
+        img = img.astype("float32") / 255.0
+        img = np.transpose(img, (2,0,1))
+        
+        tensor = torch.from_numpy(img).unsqueeze(0).to(self.engine.device)
+        
+        out = self.engine.forward(tensor)
+        
+        probs = torch.sigmoid(out)[0,0].cpu().numpy()
+        
+        heatmap = cv2.resize(probs, (frame.shape[1], frame.shape[0]))
+        
+        max_conf = np.max(probs)
+        if max_conf >= self.threshold:
+            y, x = np.unravel_index(np.argmax(heatmap), heatmap.shape)
+            cv2.circle(frame, (x,y), 10, (0,255,0), 2)
+            
+        return frame, {
+            "confidence": float(max_conf),
+            "mode": "fcn"
+        }
         
     def detect(self, frame, stop_ctrl=None):
+        mode = self.cfg.get_value("model", "mode")
+        if mode == "fcn":
+            return self._detect_fcn(frame)
         self.sync_config()
         
         if hasattr(self.engine, "log"):
@@ -113,7 +140,7 @@ class ScreenDetector:
         self.side = self.cfg.get_value("inference", "side_len")
         self.steps = self.cfg.get_value("inference", "steps")
         self.threshold = self.cfg.get_value("inference", "threshold")
-        self.batch_size = self.cfg.get_value("inference", "batch_size")
+        self.batch_size = self.cfg.get_value("inference", "batch_size", 4)
         if hasattr(self, "_last_threshold"):
             if self.threshold != self._last_threshold:
                 self.history.clear()

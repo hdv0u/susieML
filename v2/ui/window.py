@@ -32,6 +32,8 @@ class TestWindow(QWidget):
         self.settings_window()
         self.settings_logic()
         self.state_tracker.diff(self)
+        print("RUN GROUP ID:", self.run_mode_group.checkedId())
+        print("TRAIN GROUP ID:", self.train_mode_group.checkedId())
 
         self.stack.setCurrentIndex(0)
         
@@ -79,17 +81,25 @@ class TestWindow(QWidget):
 
         self.progress1 = QProgressBar()
 
-        self.radio_btns1 = []
         self.train_mode_group = QButtonGroup(self)
 
         layout.addWidget(QLabel("Train"))
 
-        # placeholder modes (no external MODELS dependency)
-        for i in range(3):
-            rb = QRadioButton(f"Mode {i}")
+        modes = [
+            ("Patch-based", "patch"),
+            ("Fully Convolutional", "fcn"),
+            ("Future Mode", "future")
+        ]
+        
+        self._train_mode_map = {}
+        
+        for i, (label, mode) in enumerate(modes):
+            rb = QRadioButton(label)
             self.train_mode_group.addButton(rb, i)
+            self._train_mode_map[i] = mode
             layout.addWidget(rb)
-            self.radio_btns1.append(rb)
+            
+        self.train_mode_group.button(0).setChecked(True)  # default to first mode
             
         self.quick_train_btn = QPushButton("Quick Train")
         self.train_btn = QPushButton("Train")
@@ -140,17 +150,24 @@ class TestWindow(QWidget):
         self.threshold.setRange(0.01, 1.0)
         self.threshold.setValue(0.67)
 
-        self.mode_group = QButtonGroup(self)
-        self.radio_btns2 = []
+        self.run_mode_group = QButtonGroup(self)
 
         controls = QVBoxLayout()
 
-        # placeholder modes (no external MODELS dependency)
-        for i in range(3):
-            rb = QRadioButton(f"Mode {i}")
-            self.mode_group.addButton(rb, i)
+        self._run_mode_map = {}
+        
+        modes = [
+            ("Patch-based", "patch"),
+            ("Fully Convolutional", "fcn"),
+            ("Future Mode", "future")
+        ]
+        
+        for i, (label, mode) in enumerate(modes):
+            rb = QRadioButton(label)
+            self.run_mode_group.addButton(rb, i)
+            self._run_mode_map[i] = mode
             controls.addWidget(rb)
-            self.radio_btns2.append(rb)
+        self.run_mode_group.button(0).setChecked(True)  # default to first mode
 
         controls.addWidget(self.m_class_cbox2)
         controls.addWidget(QLabel("Threshold"))
@@ -245,6 +262,14 @@ class TestWindow(QWidget):
         self.stop_btn1.clicked.connect(lambda: bus.stop_requested.emit())
         self.stop_btn2.clicked.connect(lambda: bus.stop_requested.emit())
     
+    def get_train_mode(self):
+        id_ = self.train_mode_group.checkedId()
+        return self._train_mode_map.get(id_, "patch")
+    
+    def get_run_mode(self):
+        id_ = self.run_mode_group.checkedId()
+        return self._run_mode_map.get(id_, "patch")
+    
     # makes JSON from pos and neg, saves and returns path, for quick train
     def json_gen(self):
         pos, _ = QFileDialog.getOpenFileNames(
@@ -318,7 +343,7 @@ class TestWindow(QWidget):
         if not json_path:
             self.log1.append("no json found")
             return
-        
+        print("UI MODE:", self.get_train_mode())
         bus.train_requested.emit({
             "dataset_path": json_path,
             "config": self.build_config()
@@ -362,11 +387,13 @@ class TestWindow(QWidget):
                 "learning_rate": self.lr.value(),
                 "arch_depth": self.arch_depth.value(),
                 "batch_size": 16,
+                "epsilon": 0.05,
             },
             "inference": {
                 "side_len": self.side_len.value(),
                 "steps": self.steps.value(),
                 "threshold": self.threshold.value(),
+                "batch_size": 4,
             },
             "augment": {
                 "augment_count": self.augment_count.value(),
@@ -378,7 +405,7 @@ class TestWindow(QWidget):
                 "multi_class": self.m_class_cbox1.isChecked(),
                 "out_channels": 1 if not self.m_class_cbox1.isChecked() else 2,
                 "input_size": (self.side_len.value(), self.side_len.value()),
-                
+                "mode": self.get_train_mode(),
             }
         }
     

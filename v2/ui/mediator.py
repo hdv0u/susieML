@@ -8,9 +8,8 @@ from core.control.config_controller import ConfigController
 class Mediator:
     def __init__(self, cfg, ui=None):
         self.ui = ui
-        self.log = self.ui.log1.append
+        self.log = self.ui.log1.append # type: ignore
         self.stop_ctrl = RunController()
-        self.config = ConfigController(cfg)
         
         self.worker = None
         
@@ -19,33 +18,36 @@ class Mediator:
         bus.stop_requested.connect(self.handle_stop)
         
     def handle_train(self, payload):
-        self.config.update(payload["config"])
+        cfg_ctrl = ConfigController(payload["config"])
         
         def logger(msg):
-            self.ui.log1.append(str(msg))
+            self.ui.log1.append(str(msg)) # type: ignore
         
         self.worker = TrainWorker(
             trainer=None,
-            payload={
-                "dataset_path": payload["dataset_path"],
-                "runner": lambda progress_fn: run_train(
-                    cfg_ctrl=self.config,
-                    dataset_path=payload["dataset_path"],
-                    log_fn=logger,
-                    progress_fn=progress_fn,
-                    stop_ctrl=self.stop_ctrl
-                )
-            },
+            payload={},
             stop_ctrl=self.stop_ctrl
         )
-
-        self.worker.log.connect(self.ui.log1.append)
-        self.worker.progress.connect(self.ui.progress1.setValue)
+        thread_log = self.worker.log.emit
+        self.worker.payload = {
+            "dataset_path": payload["dataset_path"],
+            "runner": lambda progress_fn: run_train(
+                cfg_ctrl=cfg_ctrl,
+                dataset_path=payload["dataset_path"],
+                log_fn=thread_log,
+                progress_fn=progress_fn,
+                stop_ctrl=self.stop_ctrl
+            )
+        }
+        
+        print("MEDIATOR MODE:", payload["config"]["model"]["mode"]) # type: ignore
+        self.worker.log.connect(self.ui.log1.append) # type: ignore
+        self.worker.progress.connect(self.ui.progress1.setValue) # type: ignore
         
         self.worker.start()
             
     def handle_run(self, payload):
-        self.config.update(payload["config"])
+        cfg_ctrl = ConfigController(payload["config"])
         
         if self.worker:
             self.stop_ctrl.stop()
@@ -55,21 +57,20 @@ class Mediator:
         self.stop_ctrl.reset()
         
         self.detector = build_detector(
-            cfg_ctrl=self.config,
+            cfg_ctrl=cfg_ctrl,
             model_path=payload["model_path"],
-            log_fn=self.ui.log2.append
+            log_fn=print # type: ignore
         )
-        
-        if hasattr(self, "worker") and self.worker:
-            self.worker.stop()
             
         self.worker = InferWorker(self.detector, self.stop_ctrl)
         
-        self.worker.frame_ready.connect(self.ui.update_frame)
-        self.worker.log.connect(self.ui.log2.append)
+        self.detector.engine.log = self.worker.log.emit
+        
+        self.worker.frame_ready.connect(self.ui.update_frame) # type: ignore
+        self.worker.log.connect(self.ui.log2.append) # type: ignore
         self.worker.start()
         
-        self.ui.log2.append(f"Model loaded {payload['model_path']}")
+        self.ui.log2.append(f"Model loaded {payload['model_path']}") # type: ignore
             
     def handle_stop(self):
         self.stop_ctrl.stop()

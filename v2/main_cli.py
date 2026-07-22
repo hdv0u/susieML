@@ -11,16 +11,16 @@ def main():
     
     subparsers = parser.add_subparsers(dest="command")
     
-    train_parser = subparsers.add_parser("train")
-    train_parser.add_argument("--dataset", required=True, help="Path to training dataset")
-    train_parser.add_argument("--epochs", type=int)
-    train_parser.add_argument("--lr", type=float)
+    train_parser = subparsers.add_parser("train", help="Train a new model")
+    train_parser.add_argument("-i", "--dataset", required=True, help="Path to training dataset")
+    train_parser.add_argument("--epochs", required=True, type=int, help="Iterations of training")
+    train_parser.add_argument("--lr", required=True, type=float, help="Learning rate")
     
-    infer_parser = subparsers.add_parser("infer")
-    infer_parser.add_argument("--model", required=True, help="Path to trained model")
-    infer_parser.add_argument("--threshold", type=float)
-    infer_parser.add_argument("--side", type=int)
-    infer_parser.add_argument("--steps", type=int)
+    infer_parser = subparsers.add_parser("infer", help="Infer or detect with trained model")
+    infer_parser.add_argument("-i", "--model", required=True, help="Path to trained model")
+    infer_parser.add_argument("--threshold", required=True, type=float, help="Threshold of detection")
+    infer_parser.add_argument("--side", required=True, type=int, help="idk yet")
+    infer_parser.add_argument("--steps", required=True, type=int, help="idk yet")
     
     args = parser.parse_args()
     

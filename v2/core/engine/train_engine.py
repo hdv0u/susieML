@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from data.dataset_loader import load_dataset
 from data.preproc import build_dataset
 from models.convnn import SussyCNN
+from models.convnn_fcn import SussyCNN_FCN
 
 class TrainEngine:
     def __init__(self, cfg, log_fn=print):
@@ -29,12 +30,22 @@ class TrainEngine:
         return loader
     
     def _build_model(self):
-        model = SussyCNN(
-            out_channels=self.cfg.get_value("model", "out_channels")
-        )
+        mode = self.cfg.get_value("model", "mode", "patch")
+        print(f"Building model for mode: {mode}")
+        if mode == "fcn":
+            self.log("Building FCN model")
+            model = SussyCNN_FCN(
+                out_channels=self.cfg.get_value("model", "out_channels")
+            )
+        else:
+            self.log("Building patch-based CNN model")
+            model = SussyCNN(
+                out_channels=self.cfg.get_value("model", "out_channels")
+            )
         return model
     
     def train(self, dataset_path, save_path, stop_ctrl=None, progress_fn=None, override_epochs=None):
+        mode = self.cfg.get_value("model", "mode", "patch")
         
         device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
@@ -53,25 +64,28 @@ class TrainEngine:
         epsilon = self.cfg.get_value("training", "epsilon")
         
         for epoch in range(epochs):
-            if stop_ctrl and stop_ctrl.stop():
+            if stop_ctrl and not stop_ctrl.is_running():
                 self.log("Training stopped")
                 return
             model.train()
             total_loss = 0.0
             
             for X_batch, y_batch in loader:
-                if stop_ctrl and stop_ctrl.stop():
+                if stop_ctrl and not stop_ctrl.is_running():
                     self.log("Training stopped")
                     return
                 
                 X_batch = X_batch.to(device)
                 y_batch = y_batch.to(device)
                 
-                y_batch = y_batch * (1 - epsilon) + (epsilon / 2) # label smoothing
-                
                 optimizer.zero_grad()
-                
                 outputs = model(X_batch)
+                
+                if outputs.dim() == 4:
+                    y_batch = y_batch.view(y_batch.size(0), y_batch.size(1), 1, 1)
+                    y_batch = y_batch.repeat(1,1,outputs.size(2), outputs.size(3))
+                  
+                y_batch = y_batch * (1 - epsilon) + (epsilon / 2) # label smoothing
                 loss = loss_fn(outputs, y_batch)
                 
                 loss.backward()

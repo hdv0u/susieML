@@ -2,7 +2,8 @@ MODEL = {
     "name": "cnn",
     "arch_depth": 1,
     "input_size": (128,128),
-    "out_channels": 1
+    "out_channels": 1,
+    "mode": "patch",  # options: "patch", "fcn", "future"
 }
 
 TRAINING = {

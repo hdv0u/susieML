@@ -19,5 +19,11 @@ class TrainWorker(QThread):
         def logger(msg):
             self.log.emit(str(msg))
         
-        runner = self.payload["runner"]
-        runner(self.progress.emit)
+        try:
+            runner = self.payload["runner"]
+            runner(self.progress.emit)
+        except Exception as e:
+            import traceback
+            err = traceback.format_exc()
+            logger(f"Error during training: {err}")
+            print(f"Error during training: {err}")
